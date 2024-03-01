@@ -1,0 +1,25 @@
+/* Define the styles for your chat interface */
+body {
+    font-family: Arial, sans-serif;
+  }
+  
+  h1 {
+    color: #333;
+  }
+  
+  #chat-messages {
+    height: 200px;
+    overflow-y: scroll;
+    border: 1px solid #ccc;
+    padding: 10px;
+  }
+  
+  #chat-form {
+    margin-top: 10px;
+  }
+  
+  #prompt-input {
+    width: 80%;
+  }
+  
+  

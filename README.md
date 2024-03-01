@@ -8,9 +8,8 @@ BabbleBeaver aims to democratize conversational AI, offering a plug-and-play sol
 
 ## Installation
 
-# Installation
 
-## To start the FastAPI app on your local machine, follow these steps:
+### To start the FastAPI app on your local machine, follow these steps:
 
 - Make sure you have Python installed on your machine. You can download and install Python from the official website: https://www.python.org/downloads/
 
@@ -33,6 +32,74 @@ docker-compose up --build
 ```
 
 Ensure Docker and Docker Compose are installed on your system before running these commands.
+
+Using GitHub submodules is an efficient way to manage each Large Language Model (LLM) integration in your BabbleBeaver project. Submodules allow you to keep a Git repository as a subdirectory of another Git repository. This is ideal for including external dependencies, such as LLMs, in your project. Here’s how you can set it up:
+
+### Step 1: Initialize Submodules in Your Project
+
+First, you need to add each LLM integration as a submodule to your project. To do this, navigate to the root directory of your BabbleBeaver project in your terminal or command prompt, then use the following command for each LLM repository you want to include:
+
+```bash
+git submodule add <repository-url> path/to/submodule/directory
+```
+
+For example, if you have a specific LLM integration hosted at `https://github.com/someuser/LLM-integration.git` and you want to include it in the `integrations/llm` directory of your project, you would run:
+
+```bash
+git submodule add https://github.com/someuser/LLM-integration.git integrations/llm
+```
+
+Repeat this step for each LLM integration you want to include as a submodule.
+
+### Step 2: Initialize and Update Submodules
+
+After adding all necessary submodules, initialize and update them to ensure your local project reflects the correct state of those repositories:
+
+```bash
+git submodule init
+git submodule update
+```
+
+This step ensures that the submodule directories are populated with the files from their respective repositories.
+
+### Step 3: Commit Submodule Changes
+
+Add the `.gitmodules` file and the newly added submodule directories to your project's repository and commit them:
+
+```bash
+git add .gitmodules path/to/submodule/directory
+git commit -m "Added LLM integration submodules"
+```
+
+This commit tracks the submodule's current commit in your main project's repository.
+
+### Step 4: Clone a Project with Submodules
+
+If someone needs to clone your project including its submodules, they should use the `--recurse-submodules` option with the `git clone` command:
+
+```bash
+git clone --recurse-submodules https://github.com/open-build/BabbleBeaver.git
+```
+
+This ensures that all of the submodules are correctly initialized and checked out upon cloning the project.
+
+### Step 5: Pull Updates for Submodules
+
+To update all submodules to their latest commits, use the following commands:
+
+```bash
+git submodule update --remote --merge
+```
+
+This fetches the latest changes from the remote repositories and merges them into your project.
+
+### Best Practices
+
+- **Document Each Submodule**: Ensure you document the purpose and usage of each submodule in your project's README or documentation. This helps new contributors understand the architecture and dependencies of your project.
+- **Regularly Update Submodules**: Keep your submodules up to date with their upstream repositories to incorporate bug fixes, security patches, and new features.
+- **Version Pinning**: You might want to pin each submodule to a specific commit, tag, or branch that you know works well with your project to avoid unexpected changes breaking your application.
+
+Using submodules allows you to maintain a clean separation between your core project and each LLM integration, facilitating easier updates, customization, and modular project management.
 
 ## Usage
 

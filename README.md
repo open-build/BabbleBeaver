@@ -9,7 +9,7 @@ BabbleBeaver aims to democratize conversational AI, offering a plug-and-play sol
 ## Installation
 
 
-### To start the FastAPI app on your local machine, follow these steps:
+### To start FastAPI app on your local machine, follow these steps:
 
 - Make sure you have Python installed on your machine. You can download and install Python from the official website: https://www.python.org/downloads/
 
@@ -17,12 +17,29 @@ BabbleBeaver aims to democratize conversational AI, offering a plug-and-play sol
 
 - Create a new Python virtual environment. You can create a virtual environment by running the following command in the command line:
 
+## VirtualENV
+```bash
+BabbleBeaver % virtualenv venv
+/opt/homebrew/lib/python3.9/site-packages/setuptools/command/install.py:34: SetuptoolsDeprecationWarning: setup.py install is deprecated. Use build and pip and other standards-based tools.
+  warnings.warn(
+created virtual environment CPython3.9.17.final.0-64 in 510ms
+  creator CPython3Posix(dest=/Users/greglind/Projects/buildly/insights/BabbleBeaver/venv, clear=False, no_vcs_ignore=False, global=False)
+  seeder FromAppData(download=False, pip=bundle, setuptools=bundle, wheel=bundle, via=copy, app_data_dir=/Users/greglind/Library/Application Support/virtualenv)
+    added seed packages: pip==24.0, setuptools==69.1.1, wheel==0.42.0
+  activators BashActivator,CShellActivator,FishActivator,NushellActivator,PowerShellActivator,PythonActivator
+BabbleBeaver % source venv/bin/activate
+(venv) BabbleBeaver % pip install -r requirements.txt
+(venv) BabbleBeave % uvicorn main:app --reload
 ```
-docker build -t ai-buddy .
+
+## Docker
+
+```
+docker build -t babble-beaver .
 ```
 Activate the docker environment. and then run the fastapi app
 
-```docker run -p 8000:8000 ai-buddy```
+```docker run -p 8000:8000 babble-beaver```
 
 ### Docker
 ```bash

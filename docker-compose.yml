@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  web:
+    build: .
+    command: uvicorn main:app --host 0.0.0.0 --reload
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - CHATGPT=<Your OpenAI API Key>
+      - GOOGLE_API_KEY=AIzaSyCp9B9z7AonqKzzGsaNRK1au_3ah5_1-pM
+      # Set other environment variables as needed

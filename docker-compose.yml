@@ -9,5 +9,5 @@ services:
       - "8000:8000"
     environment:
       - CHATGPT=<Your OpenAI API Key>
-      - GOOGLE_API_KEY=AIzaSyCp9B9z7AonqKzzGsaNRK1au_3ah5_1-pM
+      - GOOGLE_API_KEY=<Your Google Key>
       # Set other environment variables as needed

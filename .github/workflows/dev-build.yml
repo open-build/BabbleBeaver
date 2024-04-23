@@ -3,7 +3,7 @@ name: Build and Push to Development
 on:
   push:
     branches:
-      - master
+      - dev
 
 env:
   PROJECT_ID: dev-buildly

@@ -14,6 +14,39 @@ templates = Jinja2Templates(directory="templates")
 ai_configurator = AIConfigurator()
 message_logger = MessageLogger()
 
+import os
+
+def call_function_from_file(folder_path, module_name, function_name):
+    """
+    Use to load a module and call the function from a file in a specific folder.
+    
+    Example usage:
+    folder_path = "/path/to/your/folder"  # Update this path as needed
+    module_name = "module"
+    function_name = "example_function"
+
+    Call the function
+    result = call_function_from_file(folder_path, module_name, function_name)
+    print(result)
+    """
+    # Check if the folder exists
+    if os.path.exists(folder_path):
+        # Add the folder path to the system path to allow importing
+        import sys
+        sys.path.append(folder_path)
+        
+        # Import the module
+        module = __import__(module_name)
+        
+        # Get the function by name and call it
+        func = getattr(module, function_name)
+        return func()
+    else:
+        return "Folder does not exist."
+
+
+
+
 @app.get("/pre_user_prompt", response_class=JSONResponse)
 async def pre_user_prompt():
     """
@@ -29,18 +62,17 @@ async def pre_user_prompt():
     return JSONResponse(data)
 
 @app.get("/post_response", response_class=JSONResponse)
-async def post_response():
+async def post_response(keyword: str):
     """
-    Simulate fetching additional data from a third-party API after sending a response to the user.
+    Fetching additional data from a third-party API or feed after sending a response to the user.
     This could be further reading, sources, or related topics.
     """
-    # Example of additional data to send back
-    additional_data = {
-        "text": "If you found that interesting, you might also enjoy:",
-        "link": "https://example.com/follow-up-article",
-        "description": "A follow-up piece on the future of AI applications."
-    }
-    return JSONResponse(additional_data)
+    search_rss_feed = call_function_from_file("modules/buildly-collect", "news-blogs", "search_rss_feed")
+    # Get Data from Buildly News Blogs
+    # Search the feed
+    news = search_rss_feed(rss_url = "https://www.buildly.io/news/feed/", keyword = keyword)
+    
+    return JSONResponse(news)
 
 @app.get("/", response_class=HTMLResponse)
 async def chat_view(request: Request):

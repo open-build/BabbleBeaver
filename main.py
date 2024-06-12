@@ -3,16 +3,22 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+
 
 from ai_configurator import AIConfigurator
 from message_logger import MessageLogger
 
 app = FastAPI(debug=True)
+app.add_middleware(  # Add CORSMiddleware to your app
+    CORSMiddleware,
+    allow_origins=["http://localhost", "http://localhost:8000"],  # Update with your local development URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
-
-ai_configurator = AIConfigurator()
-message_logger = MessageLogger()
 
 import os
 

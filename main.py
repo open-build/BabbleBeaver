@@ -12,7 +12,6 @@ app = FastAPI(debug=True)
 app.add_middleware(  # Add CORSMiddleware to your app
     CORSMiddleware,
     allow_origins=["http://localhost", "http://localhost:8000", "http://localhost:3000"],
-    # Update with your local development URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -92,11 +91,11 @@ async def chatbot(request: Request):
     user_message = data.get("prompt")
     ai_provider = "gemini"  # Default AI provider
 
-    message_logger.log_message(user_message)
+    MessageLogger.log_message(user_message)
 
     try:
-        ai_configurator.set_provider(ai_provider)  # Set the AI provider based on user input
-        chat_response = ai_configurator.get_response(user_message)
+        AIConfigurator.set_provider(ai_provider)  # Set the AI provider based on user input
+        chat_response = AIConfigurator.get_response(user_message)
         return JSONResponse({"response": chat_response})
     except Exception as e:
         print(f"An error occurred: {e}")

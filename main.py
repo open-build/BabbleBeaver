@@ -8,6 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from ai_configurator import AIConfigurator
 from message_logger import MessageLogger
 
+ai_configurator = AIConfigurator()
+message_logger = MessageLogger()
+
 app = FastAPI(debug=True)
 app.add_middleware(  # Add CORSMiddleware to your app
     CORSMiddleware,
@@ -95,11 +98,9 @@ async def chatbot(request: Request):
     data = await request.json()
     user_message = data.get("prompt")
     ai_provider = "gemini"  # Default AI provider
-    m_logger = MessageLogger()
-    m_logger.log_message(user_message)
+    message_logger.log_message(user_message)
 
     try:
-        ai_configurator = AIConfigurator()
         ai_configurator.set_provider(ai_provider)  # Set the AI provider based on user input
         chat_response = ai_configurator.get_response(user_message)
         return JSONResponse({"response": chat_response})

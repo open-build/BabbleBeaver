@@ -11,7 +11,12 @@ from message_logger import MessageLogger
 app = FastAPI(debug=True)
 app.add_middleware(  # Add CORSMiddleware to your app
     CORSMiddleware,
-    allow_origins=["http://localhost", "http://localhost:8000", "http://localhost:3000"],
+    allow_origins=[
+        "http://localhost",
+        "http://localhost:8000",
+        "http://localhost:3000",
+        "http://rm-dev-babble.buildly.io"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

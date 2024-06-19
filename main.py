@@ -1,4 +1,6 @@
 # main.py
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -14,12 +16,7 @@ message_logger = MessageLogger()
 app = FastAPI(debug=True)
 app.add_middleware(  # Add CORSMiddleware to your app
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost",
-        "http://localhost:8000",
-        "http://localhost:3000",
-        "http://rm-dev-babble.buildly.io"
-    ],
+    allow_origins=os.getenv('CORS_ALLOWED_DOMAINS'),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

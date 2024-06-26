@@ -82,7 +82,7 @@ async def chat_view(request: Request):
 async def chatbot(request: Request):
     data = await request.json()
     user_message = data.get("prompt")
-    ai_provider = "gemini"  # Default AI provider
+    ai_provider = "openai"  # Default AI provider
 
     message_logger.log_message(user_message)
     

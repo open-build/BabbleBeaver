@@ -8,6 +8,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - CHATGPT=<Your OpenAI API Key>
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GOOGLE_API_KEY=<Your Google API Key>
+      - INITIAL_PROMPT_FILE_PATH=${INITIAL_PROMPT_FILE_PATH}
       # Set other environment variables as needed

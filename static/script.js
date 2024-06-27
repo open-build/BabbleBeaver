@@ -14,7 +14,20 @@ $(document).ready(function () {
     messageContainer.append(messageText);
     chatMessages.append(messageContainer);
 
+    // let's add the load dot animation to signal thinking....
+    chatMessages.append('<div id="loader" class="loader"></div>')
+
     userInput.val('');
+
+    disable_form = (should_disable) => {
+       ['user-input','submit-input'].forEach(x => {
+         state = should_disable ? 'DISABLE' : 'ENABLE'
+         console.log(`trying to ${state} ${x}`)
+         document.getElementById(x).disabled=should_disable
+       })
+    }
+
+    disable_form(true)
 
     $.ajax({
       url: '/chatbot',
@@ -34,6 +47,10 @@ $(document).ready(function () {
       error: function (error) {
         console.error('Error:', error);
       },
+      complete: function() {
+        disable_form(false)
+        document.getElementById("loader").remove()
+      }
     });
   });
 });

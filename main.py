@@ -44,22 +44,19 @@ def call_function_from_file(folder_path, module_name, function_name):
     else:
         return "Folder does not exist."
 
-
-
-
 @app.get("/pre_user_prompt", response_class=JSONResponse)
 async def pre_user_prompt():
     """
     Simulate fetching data from a third-party API before the user sends a prompt.
     This data could be used to give context or information to the user.
     """
-    # Example of what data might look like
-    data = {
-        "text": "Here's something interesting to get us started:",
-        "link": "https://example.com/interesting-article",
-        "description": "An intriguing article on the impact of AI in modern society."
-    }
-    return JSONResponse(data)
+    try:
+        initial_prompt_file_path = os.getenv('INITIAL_PROMPT_FILE_PATH')
+        with open(initial_prompt_file_path, "r") as prompt_file:
+            context = prompt_file.read()
+            return JSONResponse({"context": context})
+    except FileNotFoundError:
+        return JSONResponse({"context": ""})
 
 @app.get("/post_response", response_class=JSONResponse)
 async def post_response(keyword: str):
@@ -88,7 +85,7 @@ async def chatbot(request: Request):
     
     try:
         ai_configurator.set_provider(ai_provider)  # Set the AI provider based on user input
-        chat_response = ai_configurator.get_response(user_message)
+        chat_response = await ai_configurator.get_response(user_message)
         return JSONResponse({"response": chat_response})
     except Exception as e:
         print(f"An error occurred: {e}")

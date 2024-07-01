@@ -44,16 +44,12 @@ def call_function_from_file(folder_path, module_name, function_name):
     else:
         return "Folder does not exist."
 
-
-
-
 @app.get("/pre_user_prompt", response_class=JSONResponse)
 async def pre_user_prompt():
     """
     Simulate fetching data from a third-party API before the user sends a prompt.
     This data could be used to give context or information to the user.
     """
-    # Example of what data might look like
     data = {
         "text": "Here's something interesting to get us started:",
         "link": "https://example.com/interesting-article",
@@ -82,7 +78,7 @@ async def chat_view(request: Request):
 async def chatbot(request: Request):
     data = await request.json()
     user_message = data.get("prompt")
-    ai_provider = "gemini"  # Default AI provider
+    ai_provider = "ollama"  # Default AI provider
 
     message_logger.log_message(user_message)
     

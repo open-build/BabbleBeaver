@@ -1,4 +1,11 @@
 $(document).ready(function () {
+  // get rid of chat history on page refresh
+  sessionStorage.removeItem("messageHistory"); 
+
+  let userMessages = sessionStorage.getItem("messageHistory") !== null ? JSON.parse(sessionStorage.getItem("messageHistory"))["user"] : [];
+  let botMessages = sessionStorage.getItem("messageHistory") !== null ? JSON.parse(sessionStorage.getItem("messageHistory"))["bot"] : [];
+  let messageHistory = {user: userMessages, bot: botMessages}
+
   const chatForm = $('#chat-form');
   const chatMessages = $('#chat-messages');
   const userInput = $('#user-input');
@@ -33,9 +40,14 @@ $(document).ready(function () {
       url: '/chatbot',
       type: 'POST',
       contentType: 'application/json',
-      data: JSON.stringify({ prompt: userMessage }),
+      data: JSON.stringify({prompt: userMessage, history: messageHistory}),
       success: function (data) {
         const botMessage = data.response;
+        
+        // update chat history
+        messageHistory["user"].push(userMessage);
+        messageHistory["bot"].push(botMessage);
+        sessionStorage.setItem("messageHistory", JSON.stringify(messageHistory));
 
         const messageContainer = $('<div class="message bot-message"></div>');
         const messageText = $('<p></p>').text(botMessage);

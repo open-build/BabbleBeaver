@@ -20,6 +20,7 @@ class AIConfigurator:
                 self.initial_prompt = prompt_file.read()
         except FileNotFoundError:
             pass
+        self.conversation_history = ""
         self.active_provider = None
 
     def set_provider(self, provider_name):
@@ -33,7 +34,17 @@ class AIConfigurator:
         else:
             raise ValueError(f"Unsupported AI provider or missing API key: {provider_name}")
 
-    def get_response(self, user_message):
+    def get_response(self, history, user_message):
+        user_queries = history["user"]
+        bot_responses = history["bot"]
+
+        if user_queries and bot_responses:
+            self.conversation_history += f"User: {user_queries[-1]}\n"
+            self.conversation_history += f"Bot: {bot_responses[-1]}\n"
+        else:
+            # reset conversation history when page is refreshed
+            self.conversation_history = ""
+        
         if self.active_provider in {'openai', 'ollama'}:
             return self._get_response_from_openai(user_message)
         elif self.active_provider == 'gemini':
@@ -54,6 +65,10 @@ class AIConfigurator:
                 api_key="ollama",
                 base_url='http://localhost:11434/v1/'
             )
+        
+        # including conversation history along with query only if it isn't empty
+        if self.conversation_history:
+            user_message = self.conversation_history + user_message
 
         try:
             response = client.chat.completions.create(
@@ -78,7 +93,7 @@ class AIConfigurator:
         genai.configure(api_key=self.gemini_key)
 
         prompt = self.initial_prompt
-        prompt += user_message
+        prompt += (self.conversation_history + user_message)
         
         response = model.generate_content(prompt)
 

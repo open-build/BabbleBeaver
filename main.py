@@ -78,13 +78,14 @@ async def chat_view(request: Request):
 async def chatbot(request: Request):
     data = await request.json()
     user_message = data.get("prompt")
+    history = data.get("history")
     ai_provider = "ollama"  # Default AI provider
 
     message_logger.log_message(user_message)
     
     try:
         ai_configurator.set_provider(ai_provider)  # Set the AI provider based on user input
-        chat_response = ai_configurator.get_response(user_message)
+        chat_response = ai_configurator.get_response(history, user_message)
         return JSONResponse({"response": chat_response})
     except Exception as e:
         print(f"An error occurred: {e}")

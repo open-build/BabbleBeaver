@@ -48,14 +48,7 @@ class AIConfigurator:
             temperature=0.5
         )
         return response.choices[0].text.strip()
-
-    def _get_response_from_gemini(self, user_message):
-        response = "Gemini response to: " + user_message  # Placeholder response
-        return response
     
-    
-    def _to_markdown(self, text):
-        return Markdown(textwrap.indent(text, '> ', predicate=lambda _: True))
             
     def _get_response_from_gemini(self, user_message):
 

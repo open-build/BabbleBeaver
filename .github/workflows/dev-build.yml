@@ -1,0 +1,40 @@
+name: Build and Push to Development
+
+on:
+  push:
+    branches:
+      - dev
+
+env:
+  PROJECT_ID: dev-buildly
+  REGION: us
+  IMAGE_NAME: us-docker.pkg.dev/dev-buildly/gcr.io/dev/babble-beaver
+
+jobs:
+  build:
+    name: Build and Push to GCR
+    runs-on: ubuntu-latest
+    steps:
+    - name: "Checkout"
+      uses: actions/checkout@v3
+
+    - id: "auth"
+      uses: "google-github-actions/auth@v1"
+      with:
+        credentials_json: "${{ secrets.GCR_JSON_KEY }}"
+
+    - name: "Set up Cloud SDK"
+      uses: "google-github-actions/setup-gcloud@v1"
+
+    - name: "Use gcloud CLI"
+      run: "gcloud info"
+
+    - name: "Docker auth"
+      run: |-
+        gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+    - name: Build docker image
+      run: docker build -t $IMAGE_NAME:latest .
+
+    - name: Push to Google Artifact Registry
+      run: docker push $IMAGE_NAME:latest

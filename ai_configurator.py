@@ -53,6 +53,10 @@ class AIConfigurator:
         result = ""
         user_queries = self.conversation_history["user"]
         bot_responses = self.conversation_history["bot"]
+        
+        if not user_queries and not bot_responses:
+            return ""
+        
         threads = list(zip(user_queries, bot_responses))
         for query, response in threads:
             result += f"User: {query}\n"
@@ -91,29 +95,34 @@ class AIConfigurator:
         print(f"Number of tokens in \"{user_message}\": {query_tokens}")
 
         if self.conversation_history["user"] and self.conversation_history["bot"]:
-            # print(f"the conversation history isn't empty")
-            # if we're at the limit exactly the model's responses will be messed up
             if query_tokens + self.used_tokens >= self.token_limit:
-                # print(f"Token limit exceeded")
                 self.tokens_exceeded = True
                 current = query_tokens + self.used_tokens
 
-                # always want to be under the limit
+                # on each iteration we need to account for the history tokens as well in addition to query and response tokens(only applicable for values starting index 1 since history is being passed for all of them)
+                
+                index = 0
+                previous_thread = ""
+        
                 while current >= self.token_limit:
                     query = self.conversation_history["user"].pop(0)
                     response = self.conversation_history["bot"].pop(0)
-                    # both of these won't return a response
+            
                     q_tokens = self.retrieve_response_and_tokens(query)["tokens"]
                     res_tokens = self.retrieve_response_and_tokens(response)["tokens"]
-                    current -= (q_tokens + res_tokens)
-                    self.used_tokens -= (q_tokens + res_tokens)
+                    history_tokens = self.retrieve_response_and_tokens(previous_thread)["tokens"] if index > 0 else 0
+
+                    current -= (history_tokens + q_tokens + res_tokens)
+                    self.used_tokens -= (history_tokens + q_tokens + res_tokens)
+
+                    index += 1
+                    previous_thread = f"User: {query}\nBot: {response}\n"
 
                 # reconstruct stringified conversation history based on truncated version
                 self.stringified_conversation_history = self.format_history()
                 print(f"Conversation history: {self.stringified_conversation_history}")
 
             else: # we can just update the number of used tokens since it's within limits
-                # print(f"Tokens used is under the limit")
                 self.stringified_conversation_history += f"User: {self.conversation_history['user'][-1]}\n"
                 self.stringified_conversation_history += f"Bot: {self.conversation_history['bot'][-1]}\n"
 
@@ -151,12 +160,8 @@ class AIConfigurator:
                 base_url='http://localhost:11434/v1/'
             )
         
-        if self.stringified_conversation_history:
-            user_message = self.stringified_conversation_history + user_message
-            print("user message")
-            print(user_message)
-        else:
-            print('convo history is NULL')
+        print("convo history")
+        print(self.stringified_conversation_history)
 
         try:
             response = client.chat.completions.create(

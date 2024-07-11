@@ -8,9 +8,6 @@ $(document).ready(function () {
   let botMessages = sessionMessageHistory !== null ? JSON.parse(sessionMessageHistory)["bot"] : [];
   let localMessageHistory = {user: userMessages, bot: botMessages}
 
-  let sessionNumTokens = sessionStorage.getItem("totalUsedTokens");
-  let localNumTokens = sessionNumTokens !== null ? JSON.parse(sessionNumTokens) : 0;
-
   const chatForm = $('#chat-form');
   const chatMessages = $('#chat-messages');
   const userInput = $('#user-input');
@@ -34,12 +31,16 @@ $(document).ready(function () {
     disable_form = (should_disable) => {
        ['user-input','submit-input'].forEach(x => {
          state = should_disable ? 'DISABLE' : 'ENABLE'
-         console.log(`trying to ${state} ${x}`)
          document.getElementById(x).disabled=should_disable
        })
     }
 
     disable_form(true)
+
+    let sessionNumTokens = sessionStorage.getItem("totalUsedTokens");
+    let localNumTokens = sessionNumTokens !== null ? JSON.parse(sessionNumTokens) : 0;
+
+    console.log(`number of tokens being passed from client: ${localNumTokens}`)
 
     $.ajax({
       url: '/chatbot',
@@ -47,10 +48,12 @@ $(document).ready(function () {
       contentType: 'application/json',
       data: JSON.stringify({prompt: userMessage, history: localMessageHistory, tokens: localNumTokens}),
       success: function (data) {
+        Object.entries(data).map(pair => console.log(pair));
         const botMessage = data.response;
         
         // update client side with number of used tokens(included tokens used for the last user query and bot response)
         const usedTokens = data.usedTokens
+        console.log(`local num tokens before updating it with new count: ${localNumTokens}`)
         sessionStorage.setItem("totalUsedTokens", JSON.stringify(usedTokens));
         
         // if chat history was truncated because of token limit exceeded, needs to be updated on client side as well

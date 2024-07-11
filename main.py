@@ -80,13 +80,14 @@ async def chatbot(request: Request):
     user_message = data.get("prompt")
     history = data.get("history")
     tokens = data.get("tokens")
-    ai_provider = "ollama"  # Default AI provider
+    ai_provider = "openai"  # Default AI provider
 
     message_logger.log_message(user_message)
     
     try:
         ai_configurator.set_provider(ai_provider)  # Set the AI provider based on user input
         chat_response = ai_configurator.get_response(history, user_message, tokens)
+        print(f"chat response: {chat_response}")
         return chat_response
         # return JSONResponse({"response": chat_response["response"]})
     except Exception as e:

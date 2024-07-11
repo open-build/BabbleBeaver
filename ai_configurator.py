@@ -1,7 +1,8 @@
 import os
 from openai import OpenAI
-import tiktoken
-from vertexai.preview import tokenization
+import tiktoken # for usage with openai models
+from vertexai.preview import tokenization # for usage with gemini models
+from tokenizers import Tokenizer # for usage with ollama and models served via hugging face
 
 import pathlib
 import textwrap
@@ -16,6 +17,7 @@ class AIConfigurator:
     def __init__(self):
         self.openai_key = os.getenv('OPENAI_API_KEY')
         self.gemini_key = os.getenv('GOOGLE_API_KEY')
+        self.hf_key = os.getenv('HUGGINGFACE_AUTH_TOKEN')
         self.initial_prompt = ""
         try:
             with open(os.getenv('INITIAL_PROMPT_FILE_PATH'), "r") as prompt_file:
@@ -35,10 +37,10 @@ class AIConfigurator:
         if provider_name.lower() == 'ollama':
             self.active_provider = 'ollama'
             self.token_limit = 8192 # maximum context length
-            self.tokenizer = tiktoken.get_encoding("cl100k_base")
+            self.tokenizer = Tokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B", auth_token=self.hf_key)
         elif provider_name.lower() == 'openai' and self.openai_key:
             self.active_provider = 'openai'
-            self.token_limit = 16000 # maximum context length(40,000 TPM limit)
+            self.token_limit = 16385 # maximum context length(40,000 TPM limit)
             self.tokenizer = tiktoken.get_encoding("cl100k_base")
         elif provider_name.lower() == 'gemini' and self.gemini_key:
             self.active_provider = 'gemini'
@@ -58,29 +60,51 @@ class AIConfigurator:
         
         return result
 
+    def retrieve_response_and_tokens(self, message, fetch_response=False):
+        response = ""
+        tokens = 0
+        # if the flag is set to true, tokenize the response otherwise tokenize the query
+        if self.active_provider == "openai":
+            response = self._get_response_from_openai(message)
+            tokens =  len(self.tokenizer.encode(response)) if fetch_response else len(self.tokenizer.encode(message))
+        elif self.active_provider == "ollama":
+            response = self._get_response_from_openai(message)
+            tokens =  len(self.tokenizer.encode(response).ids) if fetch_response else len(self.tokenizer.encode(message).ids)
+        elif self.active_provider == "gemini":
+            response = self._get_response_from_gemini(message)
+            tokens =  len(self.tokenizer.count_tokens(response)) if fetch_response else len(self.tokenizer.count_tokens(message))
+        else:
+            raise ValueError("No AI service configured.")
+        
+        return {"response": response if fetch_response else None, "tokens": tokens}
+
     def get_response(self, history, user_message, total_tokens):
         self.tokens_exceeded = False
 
         self.conversation_history = history
         self.used_tokens = total_tokens
-        print(f"Used tokens: {self.used_tokens}")
+        # print(f"conversation history being passed in: {self.conversation_history}")
+        print(f"Tokens used so far received from client: {self.used_tokens}")
 
-        is_gpt_provider = self.active_provider in {'openai', 'ollama'}
-        query_tokens = len(self.tokenizer.encode(user_message)) if is_gpt_provider else self.tokenizer.count_tokens(user_message)
-        print(f"Number of tokens in {user_message}: {query_tokens}")
+        # won't return any response
+        query_tokens = self.retrieve_response_and_tokens(user_message)["tokens"]
+        print(f"Number of tokens in \"{user_message}\": {query_tokens}")
 
         if self.conversation_history["user"] and self.conversation_history["bot"]:
-            print(f"the conversation history isn't empty")
-            if query_tokens + self.used_tokens > self.token_limit:
-                print(f"Token limit exceeded")
+            # print(f"the conversation history isn't empty")
+            # if we're at the limit exactly the model's responses will be messed up
+            if query_tokens + self.used_tokens >= self.token_limit:
+                # print(f"Token limit exceeded")
                 self.tokens_exceeded = True
                 current = query_tokens + self.used_tokens
 
-                while current > self.token_limit:
+                # always want to be under the limit
+                while current >= self.token_limit:
                     query = self.conversation_history["user"].pop(0)
                     response = self.conversation_history["bot"].pop(0)
-                    q_tokens = len(self.tokenizer.encode(query)) if is_gpt_provider else self.tokenizer.count_tokens(query)
-                    res_tokens = len(self.tokenizer.encode(response)) if is_gpt_provider else self.tokenizer.count_tokens(response)
+                    # both of these won't return a response
+                    q_tokens = self.retrieve_response_and_tokens(query)["tokens"]
+                    res_tokens = self.retrieve_response_and_tokens(response)["tokens"]
                     current -= (q_tokens + res_tokens)
                     self.used_tokens -= (q_tokens + res_tokens)
 
@@ -89,33 +113,29 @@ class AIConfigurator:
                 print(f"Conversation history: {self.stringified_conversation_history}")
 
             else: # we can just update the number of used tokens since it's within limits
-                print(f"Tokens used is under the limit")
+                # print(f"Tokens used is under the limit")
                 self.stringified_conversation_history += f"User: {self.conversation_history['user'][-1]}\n"
                 self.stringified_conversation_history += f"Bot: {self.conversation_history['bot'][-1]}\n"
-                print(f"Conversation history: {self.stringified_conversation_history}")
-            
+
+                # include context being passed in also in used token count
+                self.used_tokens += self.retrieve_response_and_tokens(self.stringified_conversation_history)["tokens"]
+                print(f"tokens used after including conversation history: {self.used_tokens}")
         else:
             # reset conversation history, used tokens, and whether tokens have been exceeded when page is refreshed or very first time when conversation is started
+            # print(f"page was either refreshed or history passed in is empty")
             self.conversation_history = {}
             self.stringified_conversation_history = ""
             self.used_tokens = 0
             self.tokens_exceeded = False
         
         self.used_tokens += query_tokens # update used tokens with token count for current user query
-        result = {"response": "", "usedTokens": self.used_tokens, "updatedHistory": self.conversation_history if self.tokens_exceeded else None}
+        print(f"tokens used for the current query(question + history combined): {self.used_tokens}")
 
-        if self.active_provider in {'openai', 'ollama'}:
-            response =  self._get_response_from_openai(user_message)
-            result["response"] = response
-            result["usedTokens"] += len(self.tokenizer.encode(response))
-            return result
-        elif self.active_provider == 'gemini':
-            response = self._get_response_from_gemini(user_message)
-            result["response"] = response
-            result["usedTokens"] += self.tokenizer.count_tokens(response)
-            return result
-        else:
-            raise ValueError("No AI service configured.")
+        result = self.retrieve_response_and_tokens(user_message, True)
+        print(f"tokens used for the response: {result['tokens']}")
+        self.used_tokens += result["tokens"]
+
+        return {"response": result["response"], "usedTokens": self.used_tokens, "updatedHistory": self.conversation_history if self.tokens_exceeded else None}
     
     def _get_response_from_openai(self, user_message):
         # this is default openai data
@@ -131,16 +151,19 @@ class AIConfigurator:
                 base_url='http://localhost:11434/v1/'
             )
         
-        # including conversation history along with query only if it isn't empty
         if self.stringified_conversation_history:
             user_message = self.stringified_conversation_history + user_message
+            print("user message")
+            print(user_message)
+        else:
+            print('convo history is NULL')
 
         try:
             response = client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": self.initial_prompt},
-                    {"role": "user", "content": user_message}
+                    {"role": "user", "content": self.stringified_conversation_history + user_message}
                 ],
                 max_tokens=300,
                 n=1,

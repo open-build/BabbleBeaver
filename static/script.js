@@ -3,11 +3,6 @@ $(document).ready(function () {
   sessionStorage.removeItem("messageHistory"); 
   sessionStorage.removeItem("totalUsedTokens");
 
-  let sessionMessageHistory = sessionStorage.getItem("messageHistory");
-  let userMessages = sessionMessageHistory !== null ? JSON.parse(sessionMessageHistory)["user"] : [];
-  let botMessages = sessionMessageHistory !== null ? JSON.parse(sessionMessageHistory)["bot"] : [];
-  let localMessageHistory = {user: userMessages, bot: botMessages}
-
   const chatForm = $('#chat-form');
   const chatMessages = $('#chat-messages');
   const userInput = $('#user-input');
@@ -37,10 +32,13 @@ $(document).ready(function () {
 
     disable_form(true)
 
+    let sessionMessageHistory = sessionStorage.getItem("messageHistory");
+    let userMessages = sessionMessageHistory !== null ? JSON.parse(sessionMessageHistory)["user"] : [];
+    let botMessages = sessionMessageHistory !== null ? JSON.parse(sessionMessageHistory)["bot"] : [];
+    let localMessageHistory = {user: userMessages, bot: botMessages}
+
     let sessionNumTokens = sessionStorage.getItem("totalUsedTokens");
     let localNumTokens = sessionNumTokens !== null ? JSON.parse(sessionNumTokens) : 0;
-
-    console.log(`number of tokens being passed from client: ${localNumTokens}`)
 
     $.ajax({
       url: '/chatbot',
@@ -48,18 +46,15 @@ $(document).ready(function () {
       contentType: 'application/json',
       data: JSON.stringify({prompt: userMessage, history: localMessageHistory, tokens: localNumTokens}),
       success: function (data) {
-        Object.entries(data).map(pair => console.log(pair));
-        const botMessage = data.response;
+        const {response: botMessage, usedTokens, updatedHistory} = data;
         
         // update client side with number of used tokens(included tokens used for the last user query and bot response)
-        const usedTokens = data.usedTokens
-        console.log(`local num tokens before updating it with new count: ${localNumTokens}`)
         sessionStorage.setItem("totalUsedTokens", JSON.stringify(usedTokens));
         
         // if chat history was truncated because of token limit exceeded, needs to be updated on client side as well
-        const updatedHistory = data.updatedHistory;
         if (updatedHistory !== null) {
-          sessionStorage.setItem("messageHistory", JSON.stringify(updatedHistory));
+          localMessageHistory = updatedHistory;
+          sessionStorage.setItem("messageHistory", JSON.stringify(localMessageHistory));
         }
         
         // update chat history

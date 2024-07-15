@@ -109,11 +109,11 @@ class AIConfigurator:
                 self.stringified_conversation_history = self.format_history()
 
             else: # we can just update the number of used tokens since it's within limits
-                thread = f"User: {self.conversation_history['user'][-1]}\nBot: {self.conversation_history['bot'][-1]}\n"
-                self.stringified_conversation_history += thread   
+                self.stringified_conversation_history += f"User: {self.conversation_history['user'][-1]}\n"   
+                self.stringified_conversation_history += f"Bot: {self.conversation_history['bot'][-1]}\n"
 
                 # include context being passed in also in used token count
-                self.used_tokens += self.retrieve_response_and_tokens(thread)["tokens"]
+                self.used_tokens += self.retrieve_response_and_tokens(self.stringified_conversation_history)["tokens"]
         else:
             # reset history each time the page is refreshed(start of a new conversation)
             self.conversation_history = {}

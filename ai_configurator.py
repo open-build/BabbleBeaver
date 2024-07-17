@@ -45,8 +45,8 @@ class AIConfigurator:
             self.tokenizer = tiktoken.get_encoding("cl100k_base")
         elif provider_name.lower() == 'gemini' and self.gemini_key:
             self.active_provider = 'gemini'
-            self.token_limit = 32000 # for gemini 1.0 pro
-            self.tokenizer = tokenization.get_tokenizer_for_model("gemini-1.0-pro")
+            self.token_limit = 1_000_000 # for gemini 1.5 pro
+            self.tokenizer = tokenization.get_tokenizer_for_model("gemini-1.5-pro")
         else:
             raise ValueError(f"Unsupported AI provider or missing API key: {provider_name}")
     
@@ -72,7 +72,7 @@ class AIConfigurator:
         elif self.active_provider == "ollama":
             tokens =  len(self.tokenizer.encode(response).ids) if fetch_response else len(self.tokenizer.encode(message).ids)
         elif self.active_provider == "gemini":
-            tokens =  len(self.tokenizer.count_tokens(response)) if fetch_response else len(self.tokenizer.count_tokens(message))
+            tokens =  self.tokenizer.count_tokens(response).total_tokens if fetch_response else self.tokenizer.count_tokens(message).total_tokens
         else:
             raise ValueError("No AI service configured.")
         
@@ -162,11 +162,10 @@ class AIConfigurator:
             raise e 
             
     def _get_response_from_gemini(self, user_message):        
-        model = genai.GenerativeModel('gemini-1.0-pro')
+        model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=self.initial_prompt)
         genai.configure(api_key=self.gemini_key)
 
-        prompt = self.initial_prompt
-        prompt += (self.stringified_conversation_history + user_message)
+        prompt = self.stringified_conversation_history + user_message
         
         response = model.generate_content(prompt)
 

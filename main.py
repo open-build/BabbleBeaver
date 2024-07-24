@@ -7,14 +7,17 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from ai_configurator import AIConfigurator
 from message_logger import MessageLogger
 
+import os
+from random import sample
+
 app = FastAPI(debug=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 ai_configurator = AIConfigurator()
 message_logger = MessageLogger()
-
-import os
+with open("suggested-prompts.txt", "r") as new_file:
+    prompt_list = new_file.readlines()
 
 def call_function_from_file(folder_path, module_name, function_name):
     """
@@ -50,12 +53,8 @@ async def pre_user_prompt():
     Simulate fetching data from a third-party API before the user sends a prompt.
     This data could be used to give context or information to the user.
     """
-    data = {
-        "text": "Here's something interesting to get us started:",
-        "link": "https://example.com/interesting-article",
-        "description": "An intriguing article on the impact of AI in modern society."
-    }
-    return JSONResponse(data)
+    suggested_prompts = sample(prompt_list, 3)
+    return JSONResponse(suggested_prompts)
 
 @app.get("/post_response", response_class=JSONResponse)
 async def post_response(keyword: str):

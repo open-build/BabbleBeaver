@@ -20,6 +20,7 @@ $(document).ready(function () {
     }
   })
 
+
   const chatForm = $('#chat-form');
   const chatMessages = $('#chat-messages');
   const userInput = $('#user-input');

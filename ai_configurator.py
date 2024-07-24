@@ -54,7 +54,7 @@ class AIConfigurator:
 
         GOOGLE_API_KEY = self.gemini_key
         
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         genai.configure(api_key=GOOGLE_API_KEY)
         prompt = user_message
         

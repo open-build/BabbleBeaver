@@ -8,7 +8,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - CHATGPT=<Your OpenAI API Key>
-      - GOOGLE_API_KEY=<Your Google API Key>
-      - CORS_ALLOWED_DOMAINS=["http://localhost","https://localhost","http://localhost:3000","https://localhost:3000"]
+      OPENAI_API_KEY: "<Your OpenAI API Key>"
+      GOOGLE_API_KEY: "<Your Google API Key>"
+      CORS_ALLOWED_DOMAINS: '["http://localhost","https://localhost","http://localhost:3000","https://localhost:3000"]'
       # Set other environment variables as needed

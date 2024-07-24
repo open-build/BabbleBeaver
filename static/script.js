@@ -1,4 +1,8 @@
 $(document).ready(function () {
+  // get rid of chat history and number of tokens on page refresh
+  sessionStorage.removeItem("messageHistory"); 
+  sessionStorage.removeItem("totalUsedTokens");
+
   const chatForm = $('#chat-form');
   const chatMessages = $('#chat-messages');
   const userInput = $('#user-input');
@@ -22,20 +26,41 @@ $(document).ready(function () {
     disable_form = (should_disable) => {
        ['user-input','submit-input'].forEach(x => {
          state = should_disable ? 'DISABLE' : 'ENABLE'
-         console.log(`trying to ${state} ${x}`)
          document.getElementById(x).disabled=should_disable
        })
     }
 
     disable_form(true)
 
+    let sessionMessageHistory = sessionStorage.getItem("messageHistory");
+    let userMessages = sessionMessageHistory !== null ? JSON.parse(sessionMessageHistory)["user"] : [];
+    let botMessages = sessionMessageHistory !== null ? JSON.parse(sessionMessageHistory)["bot"] : [];
+    let localMessageHistory = {user: userMessages, bot: botMessages}
+
+    let sessionNumTokens = sessionStorage.getItem("totalUsedTokens");
+    let localNumTokens = sessionNumTokens !== null ? JSON.parse(sessionNumTokens) : 0;
+
     $.ajax({
       url: '/chatbot',
       type: 'POST',
       contentType: 'application/json',
-      data: JSON.stringify({ prompt: userMessage }),
+      data: JSON.stringify({prompt: userMessage, history: localMessageHistory, tokens: localNumTokens}),
       success: function (data) {
-        const botMessage = data.response;
+        const {response: botMessage, usedTokens, updatedHistory} = data;
+        
+        // update client side with number of used tokens(included tokens used for the last user query and bot response)
+        sessionStorage.setItem("totalUsedTokens", JSON.stringify(usedTokens));
+        
+        // if chat history was truncated because of token limit exceeded, needs to be updated on client side as well
+        if (updatedHistory !== null) {
+          localMessageHistory = updatedHistory;
+          sessionStorage.setItem("messageHistory", JSON.stringify(localMessageHistory));
+        }
+        
+        // update chat history
+        localMessageHistory["user"].push(userMessage);
+        localMessageHistory["bot"].push(botMessage);
+        sessionStorage.setItem("messageHistory", JSON.stringify(localMessageHistory));
 
         const messageContainer = $('<div class="message bot-message"></div>');
         const messageText = $('<p></p>').text(botMessage);

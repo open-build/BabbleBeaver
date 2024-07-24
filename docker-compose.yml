@@ -9,6 +9,7 @@ services:
       - "8000:8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GOOGLE_API_KEY=<Your Google API Key>
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - INITIAL_PROMPT_FILE_PATH=${INITIAL_PROMPT_FILE_PATH}
+      - HUGGINGFACE_AUTH_TOKEN=${HUGGINGFACE_AUTH_TOKEN}
       # Set other environment variables as needed

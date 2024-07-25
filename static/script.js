@@ -3,15 +3,40 @@ $(document).ready(function () {
   sessionStorage.removeItem("messageHistory"); 
   sessionStorage.removeItem("totalUsedTokens");
 
+  const suggestedPrompts = $('#suggested-prompts');
+
+  $.ajax({
+    url: "/pre_user_prompt",
+    type: "GET",
+    success: function(data) {
+      for (let i = 0; i < data.length; i++) {
+        const btnElem = $('<button class="suggested-prompt-btn"></button>');
+        btnElem.text(`${data[i]}`);
+        suggestedPrompts.append(btnElem);
+      }
+    },
+    error: function(error) {
+      console.log(`Error: ${error}`)
+    }
+  })
+
+
   const chatForm = $('#chat-form');
   const chatMessages = $('#chat-messages');
   const userInput = $('#user-input');
+  
+  // delegating event to parent element since the buttons were dynamically generated
+  suggestedPrompts.on("click", (e) => {
+    userInput.val(e.target.textContent);
+  })
 
   chatForm.on('submit', function (event) {
     event.preventDefault();
 
     const userMessage = userInput.val().trim();
     if (userMessage === '') return;
+
+    suggestedPrompts.empty();
 
     const messageContainer = $('<div class="message user-message"></div>');
     const messageText = $('<p></p>').text(userMessage);

@@ -42,6 +42,16 @@
           border-radius: 50%;
           animation: l5 1s infinite linear alternate;
         }
+        #suggested-prompts {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 20px;
+        }
+        .suggested-prompt-btn {
+            border-radius: 5px;
+        }
         @keyframes l5 {
             0%  {box-shadow: 20px 0 #000, -20px 0 #0002;background: #000 }
             33% {box-shadow: 20px 0 #000, -20px 0 #0002;background: #0002}
@@ -55,6 +65,7 @@
         <div class="chat-container">
             <h1 class="text-center">BabbleBeaver Chat Tester</h1>
             
+            <div id = "suggested-prompts"></div>
             <div id="chat-messages"></div>
             
             <form id="chat-form" class="mt-4">

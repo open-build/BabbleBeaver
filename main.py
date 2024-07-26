@@ -1,7 +1,8 @@
 # main.py
 from fastapi import FastAPI, Request
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
+# from fastapi.staticfiles import StaticFilesd
+# from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ai_configurator import AIConfigurator
@@ -11,8 +12,15 @@ import os
 from random import sample
 
 app = FastAPI(debug=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+# app.mount("/static", StaticFiles(directory="static"), name="static")
+# templates = Jinja2Templates(directory="templates")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_methods=['*'],
+    allow_headers=['*']
+)
 
 ai_configurator = AIConfigurator()
 message_logger = MessageLogger()
@@ -69,15 +77,16 @@ async def post_response(keyword: str):
     
     return JSONResponse(news)
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/", response_class=JSONResponse)
 async def chat_view(request: Request):
-    return templates.TemplateResponse("chat.html", {"request": request})
+    return JSONResponse({"status": "Server is runnning on port 8000"})
+    # return templates.TemplateResponse("chat.html", {"request": request})
 
 @app.post("/chatbot")
 async def chatbot(request: Request):
     data = await request.json()
     user_message, history, tokens = data.get("prompt"), data.get("history"), data.get("tokens")
-    ai_provider = "ollama"  # Default AI provider
+    ai_provider = "openai"  # Default AI provider
 
     message_logger.log_message(user_message)
     

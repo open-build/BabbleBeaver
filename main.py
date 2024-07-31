@@ -79,7 +79,6 @@ async def post_response(keyword: str):
 
 @app.get("/", response_class=HTMLResponse)
 async def chat_view(request: Request):
-    # return JSONResponse({"status": "Server is runnning on port 8000"})
     return templates.TemplateResponse("chat.html", {"request": request})
 
 @app.post("/chatbot")

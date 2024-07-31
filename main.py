@@ -86,7 +86,7 @@ async def chat_view(request: Request):
 async def chatbot(request: Request):
     data = await request.json()
     user_message, history, tokens = data.get("prompt"), data.get("history"), data.get("tokens")
-    llm = "phi3"
+    llm = "gpt-3.5-turbo"
 
     message_logger.log_message(user_message)
     

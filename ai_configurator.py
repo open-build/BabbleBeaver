@@ -1,54 +1,71 @@
 import os
+import configparser
+
 from openai import OpenAI
+import google.generativeai as genai
+
 import tiktoken # for usage with openai models
 from vertexai.preview import tokenization # for usage with gemini models
-from tokenizers import Tokenizer # for usage with ollama and models served via hugging face
+from tokenizers import Tokenizer # for usage with ollama models
 
 import pathlib
 import textwrap
 import httpx
 
-import google.generativeai as genai
-
 from IPython.display import display
 from IPython.display import Markdown
-
 class AIConfigurator:
     def __init__(self):
+        # loading in API keys
         self.openai_key = os.getenv('OPENAI_API_KEY')
         self.gemini_key = os.getenv('GOOGLE_API_KEY')
         self.hf_key = os.getenv('HUGGINGFACE_AUTH_TOKEN')
+
+        # loading in configuration file
+        self.config = configparser.ConfigParser()
+        self.config.read("model_config.ini")
+        self.available_models = list(self.config.sections())
+
+        # loading in context
         self.initial_prompt = ""
         try:
             with open(os.getenv('INITIAL_PROMPT_FILE_PATH'), "r") as prompt_file:
                 self.initial_prompt = prompt_file.read()
         except FileNotFoundError:
             pass
+        
+        # variables related to keeping track of conversation history and token usage
         self.conversation_history = {} # the history received from the client each time and to be used for truncation
         self.stringified_conversation_history = "" # to be passed in along with the query each time
         self.token_limit = 0 # the maximum number of tokens for a given provider
         self.used_tokens = 0 # keep track of the number of tokens used locally(user + bot combined)
         self.tokens_exceeded = False # flag to keep track of whether the number of used tokens has been exceeded
         self.tokenizer = None # tokenizer for the model being used
-        self.active_provider = None
         self.previous_thread = ""
 
-    def set_provider(self, provider_name):
+        # the provider and the model being used
+        self.active_provider = None
+        self.active_model = None
+
+    def set_model(self, model_name):
         """Set the active AI provider based on user input."""
-        if provider_name.lower() == 'ollama':
-            self.active_provider = 'ollama'
-            self.token_limit = 8192 # maximum context length
-            self.tokenizer = Tokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B", auth_token=self.hf_key)
-        elif provider_name.lower() == 'openai' and self.openai_key:
-            self.active_provider = 'openai'
-            self.token_limit = 16385 # maximum context length(40,000 TPM limit)
-            self.tokenizer = tiktoken.get_encoding("cl100k_base")
-        elif provider_name.lower() == 'gemini' and self.gemini_key:
-            self.active_provider = 'gemini'
-            self.token_limit = 1_000_000 # for gemini 1.5 pro
-            self.tokenizer = tokenization.get_tokenizer_for_model("gemini-1.5-pro")
-        else:
-            raise ValueError(f"Unsupported AI provider or missing API key: {provider_name}")
+        match_found = False
+        for model in self.available_models:
+            if model == model_name:
+                self.active_model = model
+                match_found = True
+                self.token_limit = self.config[model]["context_length"]
+                if "model_id" not in self.config[model]: # gpt/gemini model
+                    is_openai = model.startswith("gpt")
+                    self.active_provider = "openai" if is_openai else "gemini"
+                    self.tokenizer = tiktoken.get_encoding("cl100k_base") if is_openai else tokenization.get_tokenizer_for_model(model)
+                else: # ollama model
+                    self.active_provider = "ollama"
+                    self.tokenizer = Tokenizer.from_pretrained(self.config[model]["model_id"], auth_token=self.hf_key)
+                break
+        
+        if not match_found:
+            raise ValueError(f"Unsupported model or missing API key: {model_name}")
     
     def format_history(self) -> str:
         result = ""
@@ -64,7 +81,7 @@ class AIConfigurator:
     def retrieve_response_and_tokens(self, message, fetch_response=False):
         response = None
         if fetch_response:
-            response = self._get_response_from_openai(message) if self.active_provider in {'ollama', 'openai'} else self._get_response_from_gemini(message)
+            response = self._get_response_from_openai(message) if self.active_provider in {'openai', 'ollama'} else self._get_response_from_gemini(message)
         tokens = 0
         # if the flag is set to true, tokenize the response otherwise tokenize the query
         if self.active_provider == "openai":
@@ -72,7 +89,7 @@ class AIConfigurator:
         elif self.active_provider == "ollama":
             tokens =  len(self.tokenizer.encode(response).ids) if fetch_response else len(self.tokenizer.encode(message).ids)
         elif self.active_provider == "gemini":
-            tokens =  self.tokenizer.count_tokens(response).total_tokens if fetch_response else self.tokenizer.count_tokens(message).total_tokens
+            tokens = self.tokenizer.count_tokens(response).total_tokens if fetch_response else self.tokenizer.count_tokens(message).total_tokens
         else:
             raise ValueError("No AI service configured.")
         
@@ -130,14 +147,16 @@ class AIConfigurator:
         return {"response": result["response"], "usedTokens": self.used_tokens, "updatedHistory": self.conversation_history if self.tokens_exceeded else None}
     
     def _get_response_from_openai(self, user_message):
+        # print(f"Active provider: {self.active_provider}")
+        # print(f"Active model: {self.active_model}")
+
         # this is default openai data
-        model = "gpt-3.5-turbo-0125"
+        primary_model = self.active_model
         client = OpenAI(
             api_key=self.openai_key
         )
 
-        if self.active_provider.lower() == 'ollama':
-            model = "llama3"
+        if self.active_provider == 'ollama':
             client = OpenAI(
                 api_key="ollama",
                 base_url='http://localhost:11434/v1/'
@@ -145,7 +164,7 @@ class AIConfigurator:
 
         try:
             response = client.chat.completions.create(
-                model=model,
+                model=primary_model,
                 messages=[
                     {"role": "system", "content": self.initial_prompt},
                     {"role": "user", "content": self.stringified_conversation_history + user_message}
@@ -161,8 +180,13 @@ class AIConfigurator:
         except Exception as e:
             raise e 
             
-    def _get_response_from_gemini(self, user_message):        
-        model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=self.initial_prompt)
+    def _get_response_from_gemini(self, user_message):  
+        model = genai.GenerativeModel(self.active_model)
+
+        # gemini-1.0-pro doesn't support system instructions
+        if self.active_model != "gemini-pro":
+             model = genai.GenerativeModel(self.active_model, system_instruction=self.initial_prompt)
+
         genai.configure(api_key=self.gemini_key)
 
         prompt = self.stringified_conversation_history + user_message

@@ -20,17 +20,20 @@ $(document).ready(function () {
     }
   })
 
-
   const chatForm = $('#chat-form');
   const chatMessages = $('#chat-messages');
   const userInput = $('#user-input');
+  const submitButton = $('#submit-input');
   
   // delegating event to parent element since the buttons were dynamically generated
   suggestedPrompts.on("click", (e) => {
     userInput.val(e.target.textContent);
+    submitButton.click();
   })
 
-  chatForm.on('submit', function (event) {
+  chatForm.on('submit', (e) => {fetchResponse(e)});
+
+  function fetchResponse(event) {
     event.preventDefault();
 
     const userMessage = userInput.val().trim();
@@ -50,7 +53,6 @@ $(document).ready(function () {
 
     disable_form = (should_disable) => {
        ['user-input','submit-input'].forEach(x => {
-         state = should_disable ? 'DISABLE' : 'ENABLE'
          document.getElementById(x).disabled=should_disable
        })
     }
@@ -58,12 +60,12 @@ $(document).ready(function () {
     disable_form(true)
 
     let sessionMessageHistory = sessionStorage.getItem("messageHistory");
-    let userMessages = sessionMessageHistory !== null ? JSON.parse(sessionMessageHistory)["user"] : [];
-    let botMessages = sessionMessageHistory !== null ? JSON.parse(sessionMessageHistory)["bot"] : [];
+    let userMessages = sessionMessageHistory ? JSON.parse(sessionMessageHistory)["user"] : [];
+    let botMessages = sessionMessageHistory ? JSON.parse(sessionMessageHistory)["bot"] : [];
     let localMessageHistory = {user: userMessages, bot: botMessages}
 
     let sessionNumTokens = sessionStorage.getItem("totalUsedTokens");
-    let localNumTokens = sessionNumTokens !== null ? JSON.parse(sessionNumTokens) : 0;
+    let localNumTokens = sessionNumTokens ? JSON.parse(sessionNumTokens) : 0;
 
     $.ajax({
       url: '/chatbot',
@@ -102,5 +104,5 @@ $(document).ready(function () {
         document.getElementById("loader").remove()
       }
     });
-  });
+  }
 });

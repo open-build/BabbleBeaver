@@ -147,6 +147,9 @@ class AIConfigurator:
         return {"response": result["response"], "usedTokens": self.used_tokens, "updatedHistory": self.conversation_history if self.tokens_exceeded else None}
     
     def _get_response_from_openai(self, user_message):
+        # print(f"Active provider: {self.active_provider}")
+        # print(f"Active model: {self.active_model}")
+
         # this is default openai data
         primary_model = self.active_model
         client = OpenAI(

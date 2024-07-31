@@ -147,9 +147,6 @@ class AIConfigurator:
         return {"response": result["response"], "usedTokens": self.used_tokens, "updatedHistory": self.conversation_history if self.tokens_exceeded else None}
     
     def _get_response_from_openai(self, user_message):
-        # print(f"Active provider: {self.active_provider}")
-        # print(f"Active model: {self.active_model}")
-
         # this is default openai data
         primary_model = self.active_model
         client = OpenAI(
@@ -181,7 +178,12 @@ class AIConfigurator:
             raise e 
             
     def _get_response_from_gemini(self, user_message):  
-        model = genai.GenerativeModel(self.active_model, system_instruction=self.initial_prompt)
+        model = genai.GenerativeModel(self.active_model)
+
+        # gemini-1.0-pro doesn't support system instructions
+        if self.active_model != "gemini-pro":
+             model = genai.GenerativeModel(self.active_model, system_instruction=self.initial_prompt)
+
         genai.configure(api_key=self.gemini_key)
 
         prompt = self.stringified_conversation_history + user_message

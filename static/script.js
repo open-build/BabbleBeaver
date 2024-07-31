@@ -20,7 +20,6 @@ $(document).ready(function () {
     }
   })
 
-
   const chatForm = $('#chat-form');
   const chatMessages = $('#chat-messages');
   const userInput = $('#user-input');
@@ -58,12 +57,12 @@ $(document).ready(function () {
     disable_form(true)
 
     let sessionMessageHistory = sessionStorage.getItem("messageHistory");
-    let userMessages = sessionMessageHistory !== null ? JSON.parse(sessionMessageHistory)["user"] : [];
-    let botMessages = sessionMessageHistory !== null ? JSON.parse(sessionMessageHistory)["bot"] : [];
+    let userMessages = sessionMessageHistory ? JSON.parse(sessionMessageHistory)["user"] : [];
+    let botMessages = sessionMessageHistory ? JSON.parse(sessionMessageHistory)["bot"] : [];
     let localMessageHistory = {user: userMessages, bot: botMessages}
 
     let sessionNumTokens = sessionStorage.getItem("totalUsedTokens");
-    let localNumTokens = sessionNumTokens !== null ? JSON.parse(sessionNumTokens) : 0;
+    let localNumTokens = sessionNumTokens ? JSON.parse(sessionNumTokens) : 0;
 
     $.ajax({
       url: '/chatbot',

@@ -87,11 +87,12 @@ async def chatbot(request: Request):
     data = await request.json()
     user_message, history, tokens = data.get("prompt"), data.get("history"), data.get("tokens")
     llm = "gpt-3.5-turbo"
+    provider = "openai"
 
     message_logger.log_message(user_message)
     
     try:
-        ai_configurator.set_model(llm)  # Set the model based on user input
+        ai_configurator.set_model(provider, llm)  # Set the model based on user input
         chat_response = ai_configurator.get_response(history, user_message, tokens)
         return chat_response
     except Exception as e:

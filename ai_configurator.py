@@ -1,21 +1,7 @@
 import os
 import importlib
 import inspect
-
-# from openai import OpenAI
-# import google.generativeai as genai
-
-# import tiktoken
-# from vertexai.preview import tokenization
-# from tokenizers import Tokenizer
-
-import pathlib
-import textwrap
-import httpx
-
-from IPython.display import display
-from IPython.display import Markdown
-
+from typing import Dict, List, Optional
 class AIConfigurator:
     def __init__(self):
         # will hold the current model instance
@@ -42,12 +28,12 @@ class AIConfigurator:
         self.active_provider_name = ""
         self.active_model_name = ""
 
-    def set_model(self, provider, model_name):
+    def set_model(self, provider: str, model_name: str) -> None:
         """Set the active AI provider based on user input."""
         # we will only execute this whenever the provider and/or the model name is changed
         if provider != self.active_provider_name or model_name != self.active_model_name:
             try:
-                module_name = f"model-config.{provider}-config"
+                module_name = f"model-config.{provider}.{provider}-config"
                 module = importlib.import_module(module_name)
                 classes = inspect.getmembers(module, inspect.isclass)
                 classes = list(filter(lambda x: x[1].__module__ == module_name, classes))
@@ -59,10 +45,10 @@ class AIConfigurator:
 
                 self.active_provider_name = model_info[0]
                 self.active_model_name = model_info[1]
-                self.token_limit = model_info[2]
+                self.token_limit = int(model_info[2])
 
-            except ModuleNotFoundError as err:
-                raise err
+            except ModuleNotFoundError:
+                raise ModuleNotFoundError(f"The model-config directory is either non-existent or a configuration file hasn't been created for {provider} in the same directory. Please try again!")
     
     def format_history(self) -> str:
         result = ""
@@ -75,17 +61,18 @@ class AIConfigurator:
         
         return result
 
-    def retrieve_response_and_tokens(self, query, fetch_response=False):
-        response = None
+    def retrieve_response_and_tokens(self, message: str, fetch_response=False) -> Dict[Optional[str], int]:
+        response, tokens = None, None
         if fetch_response:
-            response = self.get_model_completion(query)
-
-        # if the flag is set to true, tokenize the response otherwise tokenize the query
-        tokens = self.current_model_instance.tokenize(response) if fetch_response else self.current_model_instance.tokenize(query)
+            response = self.get_model_completion(message)
+            tokens = self.current_model_instance.tokenize(response)
+        else:
+            # just tokenize the query if fetch_response is false
+            tokens = self.current_model_instance.tokenize(message)
 
         return {"response": response, "tokens": tokens}
 
-    def get_response(self, history, user_message, total_tokens):
+    def get_response(self, history: Dict[List[str], List[str]], user_message: str, total_tokens: int):
         self.tokens_exceeded = False
 
         self.conversation_history = history

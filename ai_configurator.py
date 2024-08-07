@@ -1,7 +1,10 @@
 import os
-import importlib
-import inspect
 from typing import Dict, List, Optional
+from dotenv import load_dotenv
+from model_config.model_config import ModelConfig
+
+load_dotenv()
+
 class AIConfigurator:
     def __init__(self):
         # will hold the current model instance
@@ -28,27 +31,20 @@ class AIConfigurator:
         self.active_provider_name = ""
         self.active_model_name = ""
 
-    def set_model(self, provider: str, model_name: str) -> None:
+    def set_model(self, provider: str, model_name: str, tokenizer_func, completion_func) -> None:
         """Set the active AI provider based on user input."""
         # we will only execute this whenever the provider and/or the model name is changed
         if provider != self.active_provider_name or model_name != self.active_model_name:
             try:
-                module_name = f"model-config.{provider}.{provider}-config"
-                module = importlib.import_module(module_name)
-                classes = inspect.getmembers(module, inspect.isclass)
-                classes = list(filter(lambda x: x[1].__module__ == module_name, classes))
-
-                _, target_class = classes[0]
-
-                self.current_model_instance = target_class(model_name)
+                self.current_model_instance = ModelConfig(provider, model_name, tokenizer_func, completion_func)
                 model_info = self.current_model_instance.get_model_info()
 
                 self.active_provider_name = model_info[0]
                 self.active_model_name = model_info[1]
-                self.token_limit = int(model_info[2])
+                self.token_limit = model_info[2]
 
-            except ModuleNotFoundError:
-                raise ModuleNotFoundError(f"The model-config directory is either non-existent or a configuration file hasn't been created for {provider} in the same directory. Please try again!")
+            except ValueError as e:
+                print(f"Error: {e}")
     
     def format_history(self) -> str:
         result = ""

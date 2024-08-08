@@ -7,11 +7,13 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from ai_configurator import AIConfigurator
 from message_logger import MessageLogger
+
 from openai import OpenAI
 import tiktoken
 
 import os
 from random import sample
+from typing import Optional
 
 app = FastAPI(debug=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -96,7 +98,7 @@ async def chatbot(request: Request):
 
     # specify the completion function you'd like to use
     def completion_function(api_key: str, 
-                   initial_prompt: str, 
+                   initial_prompt: Optional[str],
                    user_message: str, 
                    conversation_history: str, 
                    max_tokens: int, 
@@ -124,7 +126,7 @@ async def chatbot(request: Request):
     message_logger.log_message(user_message)
     
     try:
-        ai_configurator.set_model(provider, llm, tokenizer_function, completion_function)
+        ai_configurator.set_model(provider, llm, tokenizer_function, completion_function, use_initial_prompt=True)
         chat_response = ai_configurator.get_response(history, user_message, tokens)
         return chat_response
     except Exception as e:

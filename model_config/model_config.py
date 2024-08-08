@@ -6,10 +6,7 @@ load_dotenv()
 parser = ConfigParser()
 
 class ModelConfig():
-    parser.read("model_config/model_config.ini")
-    models = list(parser.sections())
-
-    def __init__(self, provider_name, model_name, tokenizer, completion):
+    def __init__(self, provider_name, model_name, tokenizer, completion, use_initial_prompt):
         self.default_max_tokens = 300
         self.default_temperature = 0.5
 
@@ -20,12 +17,17 @@ class ModelConfig():
 
         self.tokenizer_func = tokenizer
         self.completion_func = completion
+
+        self.use_initial_prompt = use_initial_prompt
         
         model_match_found = False
-        if not self.models:
+        parser.read("model_config/model_config.ini")
+        self.available_models = list(parser.sections())
+
+        if not self.available_models:
             raise ValueError("You haven\'t specified any models in the configuration file!")
             
-        for model in self.models:
+        for model in self.available_models:
 
             provider = parser[model]["provider"]
 
@@ -36,8 +38,8 @@ class ModelConfig():
                     model_match_found = True
 
                     # updating the current provider and model
-                    self.active_provider = provider
-                    self.active_model = model
+                    self.active_provider = provider_name
+                    self.active_model = model_name
 
                     properties = parser[model] # extracting this matched model's properties
 
@@ -58,7 +60,7 @@ class ModelConfig():
                         
                     # updating context window if it exists
                     if "context_length" not in properties:
-                        raise ValueError(f"A key with the name of \"context_length\" must be supplied for{model_name}")
+                        raise ValueError(f"A key with the name of \"context_length\" must be supplied for {model_name}")
                     else:
                         self.context_length = int(properties["context_length"])
                         
@@ -66,7 +68,7 @@ class ModelConfig():
                 
                 # we found a matching model but the provider doesn't match
                 else:
-                    raise ValueError(f"{model_name} isn't supported for {provider_name}. Please select another oneand try again.")
+                    raise ValueError(f"{model_name} isn't supported for {provider_name}. Please select another one and try again.")
 
         # the model itself is non-existent  
         if not model_match_found:
@@ -84,7 +86,7 @@ class ModelConfig():
         try:
             return self.completion_func(
                 self.API_KEY,
-                initial_prompt,
+                initial_prompt if self.use_initial_prompt else None,
                 user_message,
                 conversation_history,
                 self.default_max_tokens,

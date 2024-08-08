@@ -31,12 +31,12 @@ class AIConfigurator:
         self.active_provider_name = ""
         self.active_model_name = ""
 
-    def set_model(self, provider: str, model_name: str, tokenizer_func, completion_func) -> None:
+    def set_model(self, provider_name: str, model_name: str, tokenizer_func, completion_func, use_initial_prompt: bool) -> None:
         """Set the active AI provider based on user input."""
         # we will only execute this whenever the provider and/or the model name is changed
-        if provider != self.active_provider_name or model_name != self.active_model_name:
+        if provider_name != self.active_provider_name or model_name != self.active_model_name:
             try:
-                self.current_model_instance = ModelConfig(provider, model_name, tokenizer_func, completion_func)
+                self.current_model_instance = ModelConfig(provider_name, model_name, tokenizer_func, completion_func, use_initial_prompt)
                 model_info = self.current_model_instance.get_model_info()
 
                 self.active_provider_name = model_info[0]

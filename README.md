@@ -8,47 +8,39 @@ BabbleBeaver aims to democratize conversational AI, offering a plug-and-play sol
 
 ## Installation
 
-
-### To start FastAPI app on your local machine, follow these steps:
+### Running the FastAPI application locally
 
 - Make sure you have Python installed on your machine. You can download and install Python from the official website: https://www.python.org/downloads/
 
-- Create a new directory for your project and navigate to that directory using the command line.
+- Create a new directory for your project, then execute the following commands: `git clone https://github.com/YourUsername/BabbleBeaver.git
+` followed by `cd BabbleBeaver` to navigate to the project root directory.
 
-- Create a new Python virtual environment. You can create a virtual environment by running the following command in the command line:
+- Then execute the following commands which creates a virtual environment, activates it, then installs the necessary dependencies, followed by starting the application locally.
 
-## VirtualENV
+### VirtualENV
 ```bash
 BabbleBeaver % virtualenv venv
-/opt/homebrew/lib/python3.9/site-packages/setuptools/command/install.py:34: SetuptoolsDeprecationWarning: setup.py install is deprecated. Use build and pip and other standards-based tools.
-  warnings.warn(
-created virtual environment CPython3.9.17.final.0-64 in 510ms
-  creator CPython3Posix(dest=/Users/greglind/Projects/buildly/insights/BabbleBeaver/venv, clear=False, no_vcs_ignore=False, global=False)
-  seeder FromAppData(download=False, pip=bundle, setuptools=bundle, wheel=bundle, via=copy, app_data_dir=/Users/greglind/Library/Application Support/virtualenv)
-    added seed packages: pip==24.0, setuptools==69.1.1, wheel==0.42.0
-  activators BashActivator,CShellActivator,FishActivator,NushellActivator,PowerShellActivator,PythonActivator
 BabbleBeaver % source venv/bin/activate
 (venv) BabbleBeaver % pip install -r requirements.txt
 (venv) BabbleBeave % uvicorn main:app --reload
 ```
 
-## Docker
+- Make sure that if you're choosing to run the application using any of the following two methods, you have created and activated the virtual environment and have also installed all the necessary dependencies.
 
+### Running the FastAPI application using Docker
+
+To build the Docker image, then activate the docker environment and subsequently start the FastAPI server, run the following:
 ```
 docker build -t babble-beaver .
+docker run -p 8000:8000 babble-beaver
 ```
-Activate the docker environment. and then run the fastapi app
 
-```docker run -p 8000:8000 babble-beaver```
-
-### Docker
+### Running the FastAPI application using Docker-Compose
 ```bash
-git clone https://github.com/YourUsername/BabbleBeaver.git
-cd BabbleBeaver
 docker-compose up --build
 ```
 
-Ensure Docker and Docker Compose are installed on your system before running these commands.
+- **Ensure Docker and Docker Compose are installed on your system before running these commands.**
 
 ## Integrating a new model
 At the time, BabbleBeaver is set up to work with LLMs available through several major proprietary providers such as OpenAI, Google, Mistral, Anthropic, and Cohere. It also supports LLM integration via open-source providers such as Ollama, OpenRouter, and HuggingFace. If you would like to integrate a specific model, please make sure to follow the given steps exactly:
@@ -69,7 +61,7 @@ At the time, BabbleBeaver is set up to work with LLMs available through several 
     - **Param 2**: `provider` - The name of the provider as specified in the configuration file(**An error will be thrown if there's a mismatch**)
     - **Param 3**: `tokenizer_function` - The tokenizer associated with this given model. **Make sure that this is a function**.
     - **Param 4**: `completion_function` - All you need to do is fill in the body of this pre-created function with the API call to be made to get a response from the model. **Make sure not to modify any of the parameters**.
-    - **Param 5**: `use_initial_prompt` - Certain models may not support system instructions like `gemini-1.0-pro` for instance, although most models do. You still need to specify this parameter in the function call to `set_model` to ensure that system instructions are passed in along with each API call made if you would like to do so.
+    - **Param 5**: `use_initial_prompt` - Certain models may not support system instructions like `gemini-1.0-pro` for instance, although most models do. You still need to specify this parameter(**as a boolean**) in the function call to `set_model` to ensure that system instructions are passed in along with each API call made if you would like to do so.
 
 **IMPORTANT NOTE**: There are some special considerations especially if you're integrating an Ollama model such as the following:
 - You need to download Ollama locally and you can do so through this [link](https://ollama.com/download)

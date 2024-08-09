@@ -55,10 +55,12 @@ At the time, BabbleBeaver is set up to work with LLMs available through several 
 1. Once you're in the project root directory, navigate to the `model_config.ini` configuration file in the `model_config` directory
 
 2. For the new LLM which you'd like to use create a new entry in the configuration file exactly as follows with the following parameters. Keep in mind that none of the lines should be wrapped in quotes. The ones below are just to demonstrate how each line must be specified.
-    - *"[`name of the model`]"* - The model name must be enclosed within square brackets and the name must correspond to the actual model ID specified by the provider.
-    - *"provider = `name of provider`"*
-    - *"context_length = `the model's context window`"* - This needs to be an integer
-    - *"api_key = `os.getenv("NAME OF API KEY IN .env file")`"* - If working with Ollama, replace the right side of this expression with any random string. 
+    - *"[`name of the model`]"* - The model name must be enclosed within square brackets and the name must correspond to the actual model ID specified by the provider (**REQUIRED**)
+    - *"provider = `name of provider`"* (**REQUIRED**)
+    - *"context_length = `the model's context window`"* - This needs to be an integer (**REQUIRED**)
+    - *"api_key = `os.getenv("NAME OF API KEY IN .env file")`"* - If working with Ollama, replace the right side of this expression with any random string. (**REQUIRED**)
+    - *"max_output_tokens = `maximum number of tokens this LLM should generate per output.`"* - This needs to be an integer (**OPTIONAL**)
+    - *"temperature = `a floating point value dictating what kinds of outputs the LLM provides`"* - This value needs to be in the range `0 <= temperature <= 1` (**OPTIONAL**)
 
 3. Once you've finished adding the model to the configuration file, head over to the `main.py` file.
 
@@ -68,6 +70,11 @@ At the time, BabbleBeaver is set up to work with LLMs available through several 
     - **Param 3**: `tokenizer_function` - The tokenizer associated with this given model. **Make sure that this is a function**.
     - **Param 4**: `completion_function` - All you need to do is fill in the body of this pre-created function with the API call to be made to get a response from the model. **Make sure not to modify any of the parameters**.
     - **Param 5**: `use_initial_prompt` - Certain models may not support system instructions like `gemini-1.0-pro` for instance, although most models do. You still need to specify this parameter in the function call to `set_model` to ensure that system instructions are passed in along with each API call made if you would like to do so.
+
+**IMPORTANT NOTE**: There are some special considerations especially if you're integrating an Ollama model such as the following:
+- You need to download Ollama locally and you can do so through this [link](https://ollama.com/download)
+- Once you've downloaded Ollama, open up a terminal and first make sure to run the following command: `ollama pull model_name` where `model_name` corresponds to the model you want to integrate
+- After you've pulled the model, run `ollama serve` to start Ollama up locally. After this point, you can use the model but keep in mind that when you're specifying the `completion_function` parameter in `main.py` and when using the OpenAI completions API to generate an output from this model, you specify the `base_url` parameter as well when instantiating the client, providing `http://localhost:11434/v1/` as the value
 
 ## Usage
 

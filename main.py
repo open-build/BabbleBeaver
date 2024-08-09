@@ -8,8 +8,12 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from ai_configurator import AIConfigurator
 from message_logger import MessageLogger
 
+from openai import OpenAI
+import tiktoken
+
 import os
 from random import sample
+from typing import Optional
 
 app = FastAPI(debug=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -86,12 +90,43 @@ async def chat_view(request: Request):
 async def chatbot(request: Request):
     data = await request.json()
     user_message, history, tokens = data.get("prompt"), data.get("history"), data.get("tokens")
-    llm = "gpt-3.5-turbo"
+
+    llm = "gpt-3.5-turbo" # specify the model you want to use
+    provider = "openai" # specify the provider for this model
+    tokenizer = tiktoken.get_encoding("cl100k_base") # specify the tokenizer to use for this model
+    tokenizer_function = lambda text: len(tokenizer.encode(text)) # specify the tokenizing function to use
+
+    # specify the completion function you'd like to use
+    def completion_function(api_key: str, 
+                   initial_prompt: Optional[str],
+                   user_message: str, 
+                   conversation_history: str, 
+                   max_tokens: int, 
+                   temperature: float,
+                   model_name: str):
+        
+        client = OpenAI(api_key=api_key)
+
+        try:
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": initial_prompt},
+                    {"role": "user", "content": conversation_history + user_message}
+                ],
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+
+            return response.choices[0].message.content.strip()
+        
+        except Exception as e:
+            raise e
 
     message_logger.log_message(user_message)
     
     try:
-        ai_configurator.set_model(llm)  # Set the model based on user input
+        ai_configurator.set_model(provider, llm, tokenizer_function, completion_function, use_initial_prompt=True)
         chat_response = ai_configurator.get_response(history, user_message, tokens)
         return chat_response
     except Exception as e:

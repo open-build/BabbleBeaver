@@ -74,20 +74,22 @@ $(document).ready(function () {
       data: JSON.stringify({prompt: userMessage, history: localMessageHistory, tokens: localNumTokens}),
       success: function (data) {
         const {response: botMessage, usedTokens, updatedHistory} = data;
-        
-        // update client side with number of used tokens(included tokens used for the last user query and bot response)
-        sessionStorage.setItem("totalUsedTokens", JSON.stringify(usedTokens));
-        
-        // if chat history was truncated because of token limit exceeded, needs to be updated on client side as well
-        if (updatedHistory !== null) {
-          localMessageHistory = updatedHistory;
+
+        if (botMessage !== "Sorry... An error occurred.") {
+          // update client side with number of used tokens(included tokens used for the last user query and bot response)
+          sessionStorage.setItem("totalUsedTokens", JSON.stringify(usedTokens));
+          
+          // if chat history was truncated because of token limit exceeded, needs to be updated on client side as well
+          if (updatedHistory !== null) {
+            localMessageHistory = updatedHistory;
+            sessionStorage.setItem("messageHistory", JSON.stringify(localMessageHistory));
+          }
+          
+          // update chat history
+          localMessageHistory["user"].push(userMessage);
+          localMessageHistory["bot"].push(botMessage);
           sessionStorage.setItem("messageHistory", JSON.stringify(localMessageHistory));
         }
-        
-        // update chat history
-        localMessageHistory["user"].push(userMessage);
-        localMessageHistory["bot"].push(botMessage);
-        sessionStorage.setItem("messageHistory", JSON.stringify(localMessageHistory));
 
         const messageContainer = $('<div class="message bot-message"></div>');
         const messageText = $('<p></p>').text(botMessage);

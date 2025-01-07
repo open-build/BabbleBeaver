@@ -20,4 +20,4 @@ COPY . .
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--reload"]
 
 # Specify tag name to be created on github
-LABEL version="1.0.0"
+LABEL version="1.0.1"

@@ -35,6 +35,29 @@
             display: inline-block;
             max-width: 80%;
         }
+        .loader {
+          margin-left: 40px;
+          width: 15px;
+          aspect-ratio: 1;
+          border-radius: 50%;
+          animation: l5 1s infinite linear alternate;
+        }
+        #suggested-prompts {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 20px;
+        }
+        .suggested-prompt-btn {
+            border-radius: 5px;
+        }
+        @keyframes l5 {
+            0%  {box-shadow: 20px 0 #000, -20px 0 #0002;background: #000 }
+            33% {box-shadow: 20px 0 #000, -20px 0 #0002;background: #0002}
+            66% {box-shadow: 20px 0 #0002,-20px 0 #000; background: #0002}
+            100%{box-shadow: 20px 0 #0002,-20px 0 #000; background: #000 }
+        }
     </style>
 </head>
 <body>
@@ -42,13 +65,14 @@
         <div class="chat-container">
             <h1 class="text-center">BabbleBeaver Chat Tester</h1>
             
+            <div id = "suggested-prompts"></div>
             <div id="chat-messages"></div>
             
             <form id="chat-form" class="mt-4">
                 <div class="form-group">
                     <input type="text" id="user-input" class="form-control" placeholder="Type your message...">
                 </div>
-                <button type="submit" class="btn btn-primary btn-block">Send</button>
+                <button id="submit-input" type="submit" class="btn btn-primary btn-block">Send</button>
             </form>
         </div>
     </div>

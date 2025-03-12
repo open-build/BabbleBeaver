@@ -8,115 +8,65 @@ BabbleBeaver aims to democratize conversational AI, offering a plug-and-play sol
 
 ## Installation
 
-
-### To start FastAPI app on your local machine, follow these steps:
+### Running the FastAPI application locally
 
 - Make sure you have Python installed on your machine. You can download and install Python from the official website: https://www.python.org/downloads/
 
-- Create a new directory for your project and navigate to that directory using the command line.
+- Create a new directory for your project, then execute the following commands: `git clone https://github.com/YourUsername/BabbleBeaver.git
+` followed by `cd BabbleBeaver` to navigate to the project root directory.
 
-- Create a new Python virtual environment. You can create a virtual environment by running the following command in the command line:
+- Then execute the following commands which creates a virtual environment, activates it, then installs the necessary dependencies, followed by starting the application locally.
 
-## VirtualENV
+### VirtualENV
 ```bash
 BabbleBeaver % virtualenv venv
-/opt/homebrew/lib/python3.9/site-packages/setuptools/command/install.py:34: SetuptoolsDeprecationWarning: setup.py install is deprecated. Use build and pip and other standards-based tools.
-  warnings.warn(
-created virtual environment CPython3.9.17.final.0-64 in 510ms
-  creator CPython3Posix(dest=/Users/greglind/Projects/buildly/insights/BabbleBeaver/venv, clear=False, no_vcs_ignore=False, global=False)
-  seeder FromAppData(download=False, pip=bundle, setuptools=bundle, wheel=bundle, via=copy, app_data_dir=/Users/greglind/Library/Application Support/virtualenv)
-    added seed packages: pip==24.0, setuptools==69.1.1, wheel==0.42.0
-  activators BashActivator,CShellActivator,FishActivator,NushellActivator,PowerShellActivator,PythonActivator
 BabbleBeaver % source venv/bin/activate
 (venv) BabbleBeaver % pip install -r requirements.txt
 (venv) BabbleBeave % uvicorn main:app --reload
 ```
 
-## Docker
+- Make sure that if you're choosing to run the application using any of the following two methods, you have created and activated the virtual environment and have also installed all the necessary dependencies.
 
+### Running the FastAPI application using Docker
+
+To build the Docker image, then activate the docker environment and subsequently start the FastAPI server, run the following:
 ```
 docker build -t babble-beaver .
+docker run -p 8000:8000 babble-beaver
 ```
-Activate the docker environment. and then run the fastapi app
 
-```docker run -p 8000:8000 babble-beaver```
-
-### Docker
+### Running the FastAPI application using Docker-Compose
 ```bash
-git clone https://github.com/YourUsername/BabbleBeaver.git
-cd BabbleBeaver
 docker-compose up --build
 ```
 
-Ensure Docker and Docker Compose are installed on your system before running these commands.
+- **Ensure Docker and Docker Compose are installed on your system before running these commands.**
 
-Using GitHub submodules is an efficient way to manage each Large Language Model (LLM) integration in your BabbleBeaver project. Submodules allow you to keep a Git repository as a subdirectory of another Git repository. This is ideal for including external dependencies, such as LLMs, in your project. Here’s how you can set it up:
+## Integrating a new model
+At the time, BabbleBeaver is set up to work with LLMs available through several major proprietary providers such as OpenAI, Google, Mistral, Anthropic, and Cohere. It also supports LLM integration via open-source providers such as Ollama, OpenRouter, and HuggingFace. If you would like to integrate a specific model, please make sure to follow the given steps exactly:
+1. Once you're in the project root directory, navigate to the `model_config.ini` configuration file in the `model_config` directory
 
-### Step 1: Initialize Submodules in Your Project
+2. For the new LLM which you'd like to use create a new entry in the configuration file exactly as follows with the following parameters. Keep in mind that none of the lines should be wrapped in quotes. The ones below are just to demonstrate how each line must be specified.
+    - *"[`name of the model`]"* - The model name must be enclosed within square brackets and the name must correspond to the actual model ID specified by the provider (**REQUIRED**)
+    - *"provider = `name of provider`"* (**REQUIRED**)
+    - *"context_length = `the model's context window`"* - This needs to be an integer (**REQUIRED**)
+    - *"api_key = `os.getenv("NAME OF API KEY IN .env file")`"* - If working with Ollama, replace the right side of this expression with any random string. (**REQUIRED**)
+    - *"max_output_tokens = `maximum number of tokens this LLM should generate per output.`"* - This needs to be an integer (**OPTIONAL**)
+    - *"temperature = `a floating point value dictating what kinds of outputs the LLM provides`"* - This value needs to be in the range `0 <= temperature <= 1` (**OPTIONAL**)
 
-First, you need to add each LLM integration as a submodule to your project. To do this, navigate to the root directory of your BabbleBeaver project in your terminal or command prompt, then use the following command for each LLM repository you want to include:
+3. Once you've finished adding the model to the configuration file, head over to the `main.py` file.
 
-```bash
-git submodule add <repository-url> path/to/submodule/directory
-```
+4. Here, if you scroll down to the `/chatbot` endpoint, you will notice that you need to provide a few pieces of information pertaining to the model you want to use to get it up and running. The following are the ones you need to provide:
+    - **Param 1**: `llm` - The name of the model as specified in the configuration file(**An error will be thrown if there's a mismatch**)
+    - **Param 2**: `provider` - The name of the provider as specified in the configuration file(**An error will be thrown if there's a mismatch**)
+    - **Param 3**: `tokenizer_function` - The tokenizer associated with this given model. **Make sure that this is a function**.
+    - **Param 4**: `completion_function` - All you need to do is fill in the body of this pre-created function with the API call to be made to get a response from the model. **Make sure not to modify any of the parameters**.
+    - **Param 5**: `use_initial_prompt` - Certain models may not support system instructions like `gemini-1.0-pro` for instance, although most models do. You still need to specify this parameter(**as a boolean**) in the function call to `set_model` to ensure that system instructions are passed in along with each API call made if you would like to do so.
 
-For example, if you have a specific LLM integration hosted at `https://github.com/someuser/LLM-integration.git` and you want to include it in the `integrations/llm` directory of your project, you would run:
-
-```bash
-git submodule add https://github.com/someuser/LLM-integration.git integrations/llm
-```
-
-Repeat this step for each LLM integration you want to include as a submodule.
-
-### Step 2: Initialize and Update Submodules
-
-After adding all necessary submodules, initialize and update them to ensure your local project reflects the correct state of those repositories:
-
-```bash
-git submodule init
-git submodule update
-```
-
-This step ensures that the submodule directories are populated with the files from their respective repositories.
-
-### Step 3: Commit Submodule Changes
-
-Add the `.gitmodules` file and the newly added submodule directories to your project's repository and commit them:
-
-```bash
-git add .gitmodules path/to/submodule/directory
-git commit -m "Added LLM integration submodules"
-```
-
-This commit tracks the submodule's current commit in your main project's repository.
-
-### Step 4: Clone a Project with Submodules
-
-If someone needs to clone your project including its submodules, they should use the `--recurse-submodules` option with the `git clone` command:
-
-```bash
-git clone --recurse-submodules https://github.com/open-build/BabbleBeaver.git
-```
-
-This ensures that all of the submodules are correctly initialized and checked out upon cloning the project.
-
-### Step 5: Pull Updates for Submodules
-
-To update all submodules to their latest commits, use the following commands:
-
-```bash
-git submodule update --remote --merge
-```
-
-This fetches the latest changes from the remote repositories and merges them into your project.
-
-### Best Practices
-
-- **Document Each Submodule**: Ensure you document the purpose and usage of each submodule in your project's README or documentation. This helps new contributors understand the architecture and dependencies of your project.
-- **Regularly Update Submodules**: Keep your submodules up to date with their upstream repositories to incorporate bug fixes, security patches, and new features.
-- **Version Pinning**: You might want to pin each submodule to a specific commit, tag, or branch that you know works well with your project to avoid unexpected changes breaking your application.
-
-Using submodules allows you to maintain a clean separation between your core project and each LLM integration, facilitating easier updates, customization, and modular project management.
+**IMPORTANT NOTE**: There are some special considerations especially if you're integrating an Ollama model such as the following:
+- You need to download Ollama locally and you can do so through this [link](https://ollama.com/download)
+- Once you've downloaded Ollama, open up a terminal and first make sure to run the following command: `ollama pull model_name` where `model_name` corresponds to the model you want to integrate
+- After you've pulled the model, run `ollama serve` to start Ollama up locally. After this point, you can use the model but keep in mind that when you're specifying the `completion_function` parameter in `main.py` and when using the OpenAI completions API to generate an output from this model, you specify the `base_url` parameter as well when instantiating the client, providing `http://localhost:11434/v1/` as the value
 
 ## Usage
 

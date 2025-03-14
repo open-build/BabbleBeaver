@@ -88,14 +88,15 @@ async def chat_view(request: Request):
 
 @app.post("/chatbot")
 async def chatbot(request: Request):
+    
     data = await request.json()
     user_message, history, tokens = data.get("prompt"), data.get("history"), data.get("tokens")
 
-    llm = "gpt-3.5-turbo" # specify the model you want to use
-    provider = "openai" # specify the provider for this model
+    llm = "gemini-2.0-flash" # specify the model you want to use
+    provider = "gemini" # specify the provider for this model
     tokenizer = tiktoken.get_encoding("cl100k_base") # specify the tokenizer to use for this model
     tokenizer_function = lambda text: len(tokenizer.encode(text)) # specify the tokenizing function to use
-
+    
     # specify the completion function you'd like to use
     def completion_function(api_key: str, 
                    initial_prompt: Optional[str],
@@ -105,24 +106,37 @@ async def chatbot(request: Request):
                    temperature: float,
                    model_name: str):
         
-        client = OpenAI(api_key=api_key)
+        if provider == "openai":
+            client = OpenAI(api_key=api_key)
 
-        try:
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=[
-                    {"role": "system", "content": initial_prompt},
-                    {"role": "user", "content": conversation_history + user_message}
-                ],
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
+            try:
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {"role": "system", "content": initial_prompt},
+                        {"role": "user", "content": conversation_history + user_message}
+                    ],
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
 
-            return response.choices[0].message.content.strip()
+                return response.choices[0].message.content.strip()
+            
+            except Exception as e:
+                raise e
+        else:
+            print("Using GenerativeAI")
+            import google.generativeai as genai
+
+            model = genai.GenerativeModel(model_name)
+            genai.configure(api_key=api_key)
+            prompt = user_message
+            
+            response = model.generate_content(prompt)
+
+            # Extract the response text
+            return response.text
         
-        except Exception as e:
-            raise e
-
     message_logger.log_message(user_message)
     
     try:

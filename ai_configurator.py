@@ -94,4 +94,59 @@ class AIConfigurator:
         response = self.get_model_completion(message) if fetch_response else None
         return {"response": response, "tokens": tokens}
 
-    def process_response(self, history: Dict[s
+    def process_response(self, history: Dict[str, List[str]], user_message: str, total_tokens: int) -> Dict:
+        """Manage conversation history and ensure token limits are enforced."""
+        self.tokens_exceeded = False
+        self.conversation_history = history
+        self.used_tokens = total_tokens
+
+        query_tokens = self.retrieve_response_and_tokens(user_message)["tokens"]
+
+        if history["user"] and history["bot"]:
+            if query_tokens + self.used_tokens >= self.token_limit:
+                self.tokens_exceeded = True
+                while query_tokens + self.used_tokens >= self.token_limit:
+                    if history["user"] and history["bot"]:
+                        query = history["user"].pop(0)
+                        response = history["bot"].pop(0)
+
+                        q_tokens = self.retrieve_response_and_tokens(query)["tokens"]
+                        r_tokens = self.retrieve_response_and_tokens(response)["tokens"]
+                        history_tokens = self.retrieve_response_and_tokens(self.previous_thread)["tokens"] if self.previous_thread else 0
+
+                        self.used_tokens -= (q_tokens + r_tokens + history_tokens)
+                        self.previous_thread += f"User: {query}\nBot: {response}\n"
+
+                self.stringified_conversation_history = self.format_history()
+            else:
+                self.stringified_conversation_history += f"User: {history['user'][-1]}\n"
+                self.stringified_conversation_history += f"Bot: {history['bot'][-1]}\n"
+                self.used_tokens += self.retrieve_response_and_tokens(self.stringified_conversation_history)["tokens"]
+        else:
+            self.reset_conversation_state()
+
+        self.used_tokens += query_tokens
+        result = self.retrieve_response_and_tokens(user_message, fetch_response=True)
+        self.used_tokens += result["tokens"]
+
+        return {
+            "response": result["response"],
+            "usedTokens": self.used_tokens,
+            "updatedHistory": self.conversation_history if self.tokens_exceeded else None
+        }
+
+    def get_model_completion(self, user_message: str) -> str:
+        """Fetch model completion from the configured AI model."""
+        return self.current_model_instance.get_completion(
+            self.initial_prompt,
+            user_message,
+            self.stringified_conversation_history
+        )
+
+    def reset_conversation_state(self):
+        """Reset conversation tracking variables."""
+        self.conversation_history = {"user": [], "bot": []}
+        self.stringified_conversation_history = ""
+        self.previous_thread = ""
+        self.used_tokens = 0
+        self.tokens_exceeded = False

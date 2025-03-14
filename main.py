@@ -95,7 +95,9 @@ async def chat_view(request: Request):
 async def chatbot(request: Request):
     """Handle user chatbot requests."""
     data = await request.json()
-    user_message, history, tokens = data.get("prompt"), data.get("history"), data.get("tokens")
+    user_message = data.get("prompt", "")
+    history = data.get("history", [])
+    tokens = data.get("tokens", 0)
 
     llm = "gpt-3.5-turbo"
     provider = "openai"
@@ -111,7 +113,7 @@ async def chatbot(request: Request):
                 model=model_name,
                 messages=[
                     {"role": "system", "content": initial_prompt},
-                    {"role": "user", "content": conversation_history + user_message}
+                    {"role": "user", "content": " ".join(conversation_history) + str(user_message)}
                 ],
                 max_tokens=max_tokens,
                 temperature=temperature,
@@ -126,7 +128,7 @@ async def chatbot(request: Request):
 
     try:
         ai_configurator.set_model(provider, llm, tokenizer_function, completion_function, use_initial_prompt=True)
-        chat_response = ai_configurator.process_response(history, user_message, tokens)  # Fixed call
+        chat_response = await ai_configurator.process_response(history, user_message, tokens)  # Fixed call
         return chat_response
     except Exception as e:
         logger.error(f"Error in chatbot processing: {e}")

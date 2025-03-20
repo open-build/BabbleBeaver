@@ -3,7 +3,11 @@ from typing import Dict, List, Optional
 from dotenv import load_dotenv
 from model_config.model_config import ModelConfig
 
-load_dotenv()
+if os.path.exists('local.env'):
+    load_dotenv('local.env')
+else:
+    load_dotenv()
+    
 
 class AIConfigurator:
     def __init__(self):

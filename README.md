@@ -8,6 +8,19 @@ BabbleBeaver aims to democratize conversational AI, offering a plug-and-play sol
 
 ## Installation
 
+### Creating a .env file
+
+To configure environment variables for BabbleBeaver, you need to create a `.env` file from the provided `example.env` file. Follow these steps:
+
+1. Navigate to the project root directory where `example.env` is located.
+2. Copy the `example.env` file to create a new `.env` file:
+    ```bash
+    cp example.env .env
+    ```
+3. Open the `.env` file in a text editor and update the values as needed. This file contains environment-specific variables such as API keys and configuration settings.
+
+Make sure to keep the `.env` file secure and do not expose it publicly, as it may contain sensitive information.
+
 ### Running the FastAPI application locally
 
 - Make sure you have Python installed on your machine. You can download and install Python from the official website: https://www.python.org/downloads/

@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from configparser import ConfigParser
 
 load_dotenv()
+    
 parser = ConfigParser()
 
 class ModelConfig():

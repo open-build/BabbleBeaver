@@ -28,3 +28,12 @@ IPython
 tiktoken==0.6.0
 google-cloud-aiplatform[tokenization]==1.57.0
 tokenizers==0.19.0
+
+PyPDF2
+
+docx2txt
+pandas
+numpy
+scikit-learn
+scipy
+matplotlib

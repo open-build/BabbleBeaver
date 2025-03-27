@@ -93,37 +93,55 @@ async def chat_view(request: Request):
 
 @app.post("/chatbot")
 async def chatbot(request: Request):
-    """Handle user chatbot requests."""
+    
     data = await request.json()
-    user_message = data.get("prompt", "")
-    history = data.get("history", [])
-    tokens = data.get("tokens", 0)
+    user_message, history, tokens = data.get("prompt"), data.get("history"), data.get("tokens")
 
-    llm = "gpt-3.5-turbo"
-    provider = "openai"
-    tokenizer = tiktoken.get_encoding("cl100k_base")
-    tokenizer_function = tokenizer.encode  # Simplified
-
-    def completion_function(api_key: str, initial_prompt: Optional[str], user_message: str, conversation_history: str, max_tokens: int, temperature: float, model_name: str):
-        """Generate AI completion."""
-        openai.api_key = api_key
-
-        try:
-            response = openai.ChatCompletion.create(
-                model=model_name,
-                messages=[
-                    {"role": "system", "content": initial_prompt},
-                    {"role": "user", "content": " ".join(conversation_history) + str(user_message)}
-                ],
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
-            return response["choices"][0]["message"]["content"].strip()
+    llm = "gemini-2.0-flash" # specify the model you want to use
+    provider = "gemini" # specify the provider for this model
+    tokenizer = tiktoken.get_encoding("cl100k_base") # specify the tokenizer to use for this model
+    tokenizer_function = lambda text: len(tokenizer.encode(text)) # specify the tokenizing function to use
+    
+    # specify the completion function you'd like to use
+    def completion_function(api_key: str, 
+                   initial_prompt: Optional[str],
+                   user_message: str, 
+                   conversation_history: str, 
+                   max_tokens: int, 
+                   temperature: float,
+                   model_name: str):
         
-        except Exception as e:
-            logger.error(f"OpenAI API Error: {e}")
-            return "An error occurred."
+        if provider == "openai":
+            client = OpenAI(api_key=api_key)
 
+            try:
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {"role": "system", "content": initial_prompt},
+                        {"role": "user", "content": conversation_history + user_message}
+                    ],
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+
+                return response.choices[0].message.content.strip()
+            
+            except Exception as e:
+                raise e
+        else:
+            print("Using GenerativeAI")
+            import google.generativeai as genai
+
+            model = genai.GenerativeModel(model_name)
+            genai.configure(api_key=api_key)
+            prompt = user_message
+            
+            response = model.generate_content(prompt)
+
+            # Extract the response text
+            return response.text
+        
     message_logger.log_message(user_message)
 
     try:

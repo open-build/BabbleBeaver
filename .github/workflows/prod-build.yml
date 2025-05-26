@@ -8,7 +8,7 @@ on:
 env:
   PROJECT_ID: dev-buildly
   REGION: us
-  IMAGE_NAME: us-docker.pkg.dev/dev-buildly/gcr.io/prod/babble-beaver
+  IMAGE_NAME: ${{ vars.PROD_DOCKER_IMAGE }}
 
 jobs:
   build:
@@ -79,16 +79,3 @@ jobs:
         SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         SLACK_MESSAGE: 'Production Docker Image of buildly core pushed to Google Container Registry Successfully'
         MSG_MINIMAL: true
-
-    # Send email alert
-    - name: Email Alert
-      uses: dawidd6/action-send-mail@v3
-      with:
-        server_address: smtp.gmail.com
-        server_port: 465
-        username: ${{ secrets.MAIL_USERNAME }}
-        password: ${{ secrets.MAIL_PASSWORD }}
-        subject: Github Actions Build and Push job alert
-        to: ${{ secrets.RECIPIENT_EMAIL }}
-        from: ${{ secrets.SENDER_EMAIL }}
-        body: Production Docker Image of buildly core pushed to Google Container Registry Successfully

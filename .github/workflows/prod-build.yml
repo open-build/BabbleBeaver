@@ -6,7 +6,6 @@ on:
       - prod
 
 env:
-  PROJECT_ID: dev-buildly
   REGION: us-west1
   IMAGE_NAME: ${{ vars.PROD_DOCKER_IMAGE }}
 

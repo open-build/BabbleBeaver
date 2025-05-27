@@ -7,7 +7,7 @@ on:
 
 env:
   PROJECT_ID: dev-buildly
-  REGION: us
+  REGION: us-west1
   IMAGE_NAME: ${{ vars.PROD_DOCKER_IMAGE }}
 
 jobs:

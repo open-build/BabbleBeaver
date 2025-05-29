@@ -1,4 +1,5 @@
 # main.py
+from http.client import HTTPException
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -8,12 +9,29 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from ai_configurator import AIConfigurator
 from message_logger import MessageLogger
 
-from openai import OpenAI
+from google.cloud import aiplatform
+import vertexai
+from vertexai.preview.generative_models import  GenerativeModel
+from google.cloud import aiplatform
+
+# from openai import OpenAI
 import tiktoken
 
 import os
 from random import sample
 from typing import Optional
+
+# Google Vertex AI Authentication, uvicorn main:app --reload      
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+PROJECT_ID = os.getenv("PROJECT_ID")
+LOCATION = os.getenv("LOCATION")
+ENDPOINT_ID = os.getenv("ENDPOINT_ID")
+vertexai.init(project=PROJECT_ID, location=LOCATION)
+model = GenerativeModel('gemini-2.0-flash-lite-001')
+aiplatform.init(
+    project=PROJECT_ID,
+    location=LOCATION
+)
 
 app = FastAPI(debug=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -98,7 +116,7 @@ async def chatbot(request: Request):
     tokenizer_function = lambda text: len(tokenizer.encode(text)) # specify the tokenizing function to use
     with open("initial-prompt.txt", "r") as prompt_file:
         initial_prompt = prompt_file.read().strip()
-    
+
     # specify the completion function you'd like to use
     def completion_function(api_key: str, 
                    initial_prompt: Optional[str],
@@ -108,35 +126,49 @@ async def chatbot(request: Request):
                    temperature: float,
                    model_name: str):
         
-        if provider == "openai":
-            client = OpenAI(api_key=api_key)
+        '''
+        Genimi Model from Vertex AI
+        '''
+        full_prompt = f"""You are a helpful assistant that provides resaurant names and menu items to questions for users in Seattle. 
+        Answer the following user question using ONLY the relevant restaurant and product details provided below. Be specific, concise, and friendly. 
+        User Question:
+        {user_message}
+        """
 
-            try:
-                response = client.chat.completions.create(
-                    model=model_name,
-                    messages=[
-                        {"role": "system", "content": initial_prompt},
-                        {"role": "user", "content": conversation_history + user_message}
-                    ],
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                )
+        # if provider == "openai":
+        #     client = OpenAI(api_key=api_key)
 
-                return response.choices[0].message.content.strip()
+        #     try:
+        #         response = client.chat.completions.create(
+        #             model=model_name,
+        #             messages=[
+        #                 {"role": "system", "content": initial_prompt},
+        #                 {"role": "user", "content": conversation_history + user_message}
+        #             ],
+        #             max_tokens=max_tokens,
+        #             temperature=temperature,
+        #         )
+
+        #         return response.choices[0].message.content.strip()
             
-            except Exception as e:
-                raise e
-        else:
-            import google.generativeai as genai
+        #     except Exception as e:
+        #         raise e
+        # else:
 
-            model = genai.GenerativeModel(model_name)
-            genai.configure(api_key=api_key)
-            prompt = user_message
+        aiplatform.init(project=PROJECT_ID, location=LOCATION)
+        model = GenerativeModel(model_name=ENDPOINT_ID)
+        response = model.generate_content(user_message)
+        return response.candidates[0].content.parts[0].text
+        #     import google.generativeai as genai
+
+        #     model = genai.GenerativeModel(model_name)
+        #     genai.configure(api_key=api_key)
+        #     prompt = user_message
             
-            response = model.generate_content(prompt)
+        #     response = model.generate_content(prompt)
 
-            # Extract the response text
-            return response.text
+        #     # Extract the response text
+        #     return response.text
         
     message_logger.log_message(user_message)
     

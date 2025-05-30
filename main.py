@@ -96,6 +96,8 @@ async def chatbot(request: Request):
     provider = "gemini" # specify the provider for this model
     tokenizer = tiktoken.get_encoding("cl100k_base") # specify the tokenizer to use for this model
     tokenizer_function = lambda text: len(tokenizer.encode(text)) # specify the tokenizing function to use
+    with open("initial-prompt.txt", "r") as prompt_file:
+        initial_prompt = prompt_file.read().strip()
     
     # specify the completion function you'd like to use
     def completion_function(api_key: str, 
@@ -125,7 +127,6 @@ async def chatbot(request: Request):
             except Exception as e:
                 raise e
         else:
-            print("Using GenerativeAI")
             import google.generativeai as genai
 
             model = genai.GenerativeModel(model_name)

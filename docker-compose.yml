@@ -1,10 +1,8 @@
-version: '3.8'
+version: '3.7'
 services:
   web:
     build: .
     command: uvicorn main:app --host 0.0.0.0 --reload
-    volumes:
-      - .:/app
     ports:
       - "8000:8000"
     environment:
@@ -12,4 +10,3 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - INITIAL_PROMPT_FILE_PATH=${INITIAL_PROMPT_FILE_PATH}
       - HUGGINGFACE_AUTH_TOKEN=${HUGGINGFACE_AUTH_TOKEN}
-      # Set other environment variables as needed

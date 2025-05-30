@@ -4,11 +4,7 @@ from dotenv import load_dotenv
 from model_config.model_config import ModelConfig
 import openai  # Ensure this is installed and available
 
-if os.path.exists('local.env'):
-    load_dotenv('local.env')
-else:
-    load_dotenv()
-    
+load_dotenv()
 
 class AIConfigurator:
     def __init__(self):

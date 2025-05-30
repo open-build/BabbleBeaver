@@ -6,7 +6,10 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # Set other environment variables as needed
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - INITIAL_PROMPT_FILE_PATH=${INITIAL_PROMPT_FILE_PATH}
       - HUGGINGFACE_AUTH_TOKEN=${HUGGINGFACE_AUTH_TOKEN}
+      - CORS_ALLOWED_DOMAINS:'["http://localhost","https://localhost","http://localhost:3000","https://localhost:3000"]'
+

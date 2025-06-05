@@ -19,6 +19,11 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Install build tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential
+
     # # auto generate tag from label defined in Dockerfile
     # - uses: butlerlogic/action-autotag@1.1.2
     #   id: tag_version

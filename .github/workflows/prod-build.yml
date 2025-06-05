@@ -18,11 +18,11 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 0
-
+     
     - name: Install build tools
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential
+      run: 
+         sudo apt-get update
+         sudo apt-get install -y build-essential python3-dev gcc
 
     # # auto generate tag from label defined in Dockerfile
     # - uses: butlerlogic/action-autotag@1.1.2

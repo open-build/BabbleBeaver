@@ -19,12 +19,14 @@ jobs:
       with:
         fetch-depth: 0
      
-    - name: Install build tools
+    - name: Install build tools and validate
       run: |
         sudo apt-get update -y
         sudo apt-get install -y build-essential python3-dev gcc g++ make
-        gcc --version
-        g++ --version
+        gcc --version || { echo "gcc installation failed"; exit 1; }
+        g++ --version || { echo "g++ installation failed"; exit 1; }
+        python3 --version || { echo "Python3 is not installed"; exit 1; }
+        pip --version || { echo "Pip is not installed"; exit 1; }
     
     - name: Install Python build dependencies
       run: |

@@ -19,11 +19,15 @@ jobs:
       with:
         fetch-depth: 0
 
-    # Add this step to install necessary build tools
+    # Step to install required build tools
     - name: Install required build tools
       run: |
         sudo apt-get update -y
         sudo apt-get install -y build-essential python3-dev gcc g++ make
+    
+    # Step to install dependencies
+    - name: Install dependencies
+      run: pip install --no-cache-dir -r requirements.txt
 
     - id: "auth"
       uses: "google-github-actions/auth@v1"

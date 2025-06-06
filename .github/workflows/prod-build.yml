@@ -18,61 +18,19 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 0
-     
-    - name: Install build tools and validate
+
+    # Add this step to install necessary build tools
+    - name: Install required build tools
       run: |
         sudo apt-get update -y
         sudo apt-get install -y build-essential python3-dev gcc g++ make
-        gcc --version || { echo "gcc installation failed"; exit 1; }
-        g++ --version || { echo "g++ installation failed"; exit 1; }
-        python3 --version || { echo "Python3 is not installed"; exit 1; }
-        pip --version || { echo "Pip is not installed"; exit 1; }
-    
-    - name: Install Python build dependencies
-      run: |
-        python3 -m pip install --upgrade pip setuptools wheel
-    
-    - name: Debug Environment
-      run: |
-        python3 --version
-        pip --version
-        gcc --version
-        g++ --version
-
-    # # auto generate tag from label defined in Dockerfile
-    # - uses: butlerlogic/action-autotag@1.1.2
-    #   id: tag_version
-    #   env:
-    #     GITHUB_TOKEN: "${{ secrets.RELEASE_TOKEN }}"
-    #   with:
-    #     strategy: docker
-    #     tag_prefix: "v"
-
-    # # Create release notes
-    # - name: Build changelog
-    #   id: build_changelog
-    #   uses: mikepenz/release-changelog-builder-action@main
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-
-    # # Create release
-    # - name: Create Release
-    #   id: create_release
-    #   uses: actions/create-release@latest
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-    #   with:
-    #     tag_name: ${{ steps.tag_version.outputs.tagname }}
-    #     release_name: Release ${{ steps.tag_version.outputs.tagname }}
-    #     body: ${{ steps.build_changelog.outputs.changelog }}
-    #     draft: false
-    #     prerelease: false
 
     - id: "auth"
       uses: "google-github-actions/auth@v1"
       with:
         credentials_json: "${{ secrets.PROD_GCR_JSON_KEY }}"
 
+    # Other steps remain the same
     - name: "Set up Cloud SDK"
       uses: "google-github-actions/setup-gcloud@v1"
 
@@ -80,7 +38,7 @@ jobs:
       run: "gcloud info"
 
     - name: "Docker auth"
-      run: |-
+      run: |
         gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
     # Build docker image
@@ -91,14 +49,6 @@ jobs:
     - name: Push to Google Artifact Registry
       run: docker push $IMAGE_NAME:latest
 
-    # # Send message on Slack
-    # - name: Slack Notification
-    #   uses: rtCamp/action-slack-notify@v2
-    #   env:
-    #     SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-    #     SLACK_MESSAGE: 'Production Docker Image of buildly core pushed to Google Container Registry Successfully'
-    #     MSG_MINIMAL: true
-
     - name: Deploy on Kapstan
       id: Kapstan
       uses: kapstan-io/deployment-action@latest
@@ -108,3 +58,4 @@ jobs:
         image_tag: latest
         kapstan_api_key: ${{ secrets.PROD_KAPSTAN_KEY }}
         wait_for_deployment: false
+

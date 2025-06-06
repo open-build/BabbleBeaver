@@ -171,3 +171,4 @@ cython_debug/
 
 .env
 
+secure_credentials/*

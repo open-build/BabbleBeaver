@@ -171,3 +171,5 @@ cython_debug/
 
 .env
 
+# asset class
+/assets

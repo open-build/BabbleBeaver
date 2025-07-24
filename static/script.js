@@ -58,7 +58,6 @@ $(document).ready(function () {
     }
 
     disable_form(true)
-
     let sessionMessageHistory = sessionStorage.getItem("messageHistory");
     let userMessages = sessionMessageHistory ? JSON.parse(sessionMessageHistory)["user"] : [];
     let botMessages = sessionMessageHistory ? JSON.parse(sessionMessageHistory)["bot"] : [];
@@ -73,8 +72,9 @@ $(document).ready(function () {
       contentType: 'application/json',
       data: JSON.stringify({prompt: userMessage, history: localMessageHistory, tokens: localNumTokens}),
       success: function (data) {
+        console.log("data: ", data.kai_response);
         const {response: botMessage, usedTokens, updatedHistory} = data;
-
+        // console.log("response: ", response);
         if (botMessage !== "Sorry... An error occurred.") {
           // update client side with number of used tokens(included tokens used for the last user query and bot response)
           sessionStorage.setItem("totalUsedTokens", JSON.stringify(usedTokens));
@@ -86,13 +86,13 @@ $(document).ready(function () {
           }
           
           // update chat history
-          localMessageHistory["user"].push(userMessage);
-          localMessageHistory["bot"].push(botMessage);
-          sessionStorage.setItem("messageHistory", JSON.stringify(localMessageHistory));
+          // localMessageHistory["user"].push(userMessage);
+          // localMessageHistory["bot"].push(botMessage);
+          // sessionStorage.setItem("messageHistory", JSON.stringify(localMessageHistory));
         }
 
         const messageContainer = $('<div class="message bot-message"></div>');
-        const messageText = $('<p></p>').text(botMessage);
+        const messageText = $('<p></p>').text(data.kai_response.text);
         messageContainer.append(messageText);
         chatMessages.append(messageContainer);
 
@@ -100,6 +100,7 @@ $(document).ready(function () {
       },
       error: function (error) {
         console.error('Error:', error);
+        console.log("HERE")
       },
       complete: function() {
         disable_form(false)

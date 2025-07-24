@@ -19,11 +19,12 @@ import tiktoken
 from ai_configurator import AIConfigurator
 from message_logger import MessageLogger
 
-
 from google.cloud import aiplatform
 import vertexai
 from vertexai.preview.generative_models import  GenerativeModel
 from google.cloud import aiplatform
+from google import genai
+from google.genai import types
 
 # from openai import OpenAI
 import tiktoken
@@ -45,12 +46,14 @@ except FileNotFoundError:
     prompt_list = []
 
 # Google Vertex AI Authentication, uvicorn main:app --reload      
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+# os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 PROJECT_ID = os.getenv("PROJECT_ID")
+PROJECT_NAME = os.getenv("PROJECT_NAME")
 LOCATION = os.getenv("LOCATION")
 ENDPOINT_ID = os.getenv("ENDPOINT_ID")
-vertexai.init(project=PROJECT_ID, location=LOCATION)
-model = GenerativeModel('gemini-2.0-flash-lite-001')
+
+vertexai.init(project=PROJECT_NAME, location=LOCATION)
+model = GenerativeModel(os.getenv("FINE_TUNED_MODEL"))
 aiplatform.init(
     project=PROJECT_ID,
     location=LOCATION
@@ -117,18 +120,103 @@ async def chat_view(request: Request):
     return templates.TemplateResponse("chat.html", {"request": request})
 
 
+'''
+Generate answer with genai(kai_fine_2_5_v2) client from Vertex AI
+'''
+def generate_from(user_prompt, project_id, location, endpoint_id):
+    client = genai.Client(
+        vertexai=True,
+        project=project_id,
+        location=location,
+    )
+
+    model=endpoint_id
+    contents = [
+        types.Content(
+            role="user",
+            parts=[
+                types.Part.from_text(text=user_prompt)
+            ]
+        )
+    ]
+
+    generate_content_config = types.GenerateContentConfig(
+        temperature = 1,
+        top_p = 1,
+        seed = 0,
+        max_output_tokens = 65535,
+        safety_settings = [types.SafetySetting(
+        category="HARM_CATEGORY_HATE_SPEECH",
+        threshold="OFF"
+        ),types.SafetySetting(
+        category="HARM_CATEGORY_DANGEROUS_CONTENT",
+        threshold="OFF"
+        ),types.SafetySetting(
+        category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        threshold="OFF"
+        ),types.SafetySetting(
+        category="HARM_CATEGORY_HARASSMENT",
+        threshold="OFF"
+        )],
+        thinking_config=types.ThinkingConfig(
+        thinking_budget=-1,
+        ),
+    )
+
+    full_text = ""
+    model_version = None
+    total_token_count = None
+
+    for chunk in client.models.generate_content_stream(
+        model = model,
+        contents = contents,
+        config = generate_content_config,
+        ):
+        try:
+            # Get text part(s) from the candidate
+            parts = chunk.candidates[0].content.parts
+            for part in parts:
+                if hasattr(part, "text"):
+                    full_text += part.text
+
+            # Get model_version once
+            if model_version is None and hasattr(chunk, "model_version"):
+                model_version = chunk.model_version
+
+            # Get token count if it's in usage_metadata
+            if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
+                usage = chunk.usage_metadata
+                if hasattr(usage, "total_token_count") and usage.total_token_count:
+                    total_token_count = usage.total_token_count
+
+        except Exception as e:
+            print("Error while parsing chunk:", e)
+
+    # Final parsed dictionary
+    parsed_output = {
+        "text": full_text.strip(),
+        "model_version": model_version,
+        "total_token_count": total_token_count
+    }
+    return parsed_output
+
+
+
 @app.post("/chatbot")
 async def chatbot(request: Request):
+    project_id = os.getenv("PROJECT_ID")
+    location = os.getenv("LOCATION")
+    endpoint_id = os.getenv("ENDPOINT_ID")
     
     data = await request.json()
     user_message, history, tokens = data.get("prompt"), data.get("history"), data.get("tokens")
 
-    llm = "gemini-2.0-flash" # specify the model you want to use
+    llm = "gemini-2.5-flash" # specify the model you want to use
     provider = "gemini" # specify the provider for this model
     tokenizer = tiktoken.get_encoding("cl100k_base") # specify the tokenizer to use for this model
     tokenizer_function = lambda text: len(tokenizer.encode(text)) # specify the tokenizing function to use
-    with open("initial-prompt.txt", "r") as prompt_file:
-        initial_prompt = prompt_file.read().strip()
+    # with open("initial-prompt.txt", "r") as prompt_file:
+    #     initial_prompt = prompt_file.read().strip()
 
     # specify the completion function you'd like to use
     def completion_function(api_key: str, 
@@ -147,6 +235,12 @@ async def chatbot(request: Request):
         User Question:
         {user_message}
         """
+
+
+        response = generate_from(full_prompt, project_id, location, endpoint_id)
+        print(response)
+        print(history)
+        return response
 
         # if provider == "openai":
         #     client = OpenAI(api_key=api_key)
@@ -168,10 +262,11 @@ async def chatbot(request: Request):
         #         raise e
         # else:
 
-        aiplatform.init(project=PROJECT_ID, location=LOCATION)
-        model = GenerativeModel(model_name=ENDPOINT_ID)
-        response = model.generate_content(user_message)
-        return response.candidates[0].content.parts[0].text
+        # aiplatform.init(project=PROJECT_ID, location=LOCATION)
+        # model = GenerativeModel(model_name=ENDPOINT_ID)
+        # response = model.generate_content(user_message)
+        # return response.candidates[0].content.parts[0].text
+    
         #     import google.generativeai as genai
 
         #     model = genai.GenerativeModel(model_name)
@@ -183,11 +278,23 @@ async def chatbot(request: Request):
         #     # Extract the response text
         #     return response.text
         
-    message_logger.log_message(user_message)
+
+    full_prompt = f"""You are a helpful assistant that provides resaurant names and menu items to questions for users in Seattle. 
+        Answer the following user question using ONLY the relevant restaurant and product details provided below. Be specific, concise, and friendly. 
+        User Question:
+        {user_message}
+        """
+
+    response = generate_from(full_prompt, project_id, location, endpoint_id)
+    # message_logger.log_message(user_message)
+
+    return {'prompt': full_prompt, 'kai_response': response, 'history': 'response', 'tokens': 'localNumTokens'}
 
     try:
+        # chat_response = completion_function(user_message=user_message)
         ai_configurator.set_model(provider, llm, tokenizer_function, completion_function, use_initial_prompt=True)
-        chat_response = await ai_configurator.process_response(history, user_message, tokens)  # Fixed call
+        chat_response = ai_configurator.process_response(history, user_message, tokens)  # Fixed call
+        # print("chat_response:", chat_response)
         return chat_response
     except Exception as e:
         logger.error(f"Error in chatbot processing: {e}")

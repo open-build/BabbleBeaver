@@ -40,3 +40,7 @@ matplotlib
 
 vertexai
 google-cloud-aiplatform
+google-genai
+
+psycopg2
+databases

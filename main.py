@@ -14,10 +14,9 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
 
 import openai  # Corrected import
-import tiktoken
-
 from ai_configurator import AIConfigurator
 from message_logger import MessageLogger
+from response_logger import ChatLogger
 
 from google.cloud import aiplatform
 import vertexai
@@ -26,8 +25,11 @@ from google.cloud import aiplatform
 from google import genai
 from google.genai import types
 
-# from openai import OpenAI
-import tiktoken
+# DB
+import psycopg2
+from psycopg2 import sql
+from psycopg2.extras import Json
+import databases
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
@@ -37,6 +39,7 @@ logger = logging.getLogger(__name__)
 # Initialize dependencies
 ai_configurator = AIConfigurator()
 message_logger = MessageLogger()
+response_logger = ChatLogger()
 
 # Load prompt suggestions
 try:
@@ -52,6 +55,12 @@ PROJECT_NAME = os.getenv("PROJECT_NAME")
 LOCATION = os.getenv("LOCATION")
 ENDPOINT_ID = os.getenv("ENDPOINT_ID")
 
+
+# DATABASE_URL = "postgresql://user:password@localhost/dbname"
+# database = databases.Database(DATABASE_URL)
+# DATABASE_URL: str = "postgresql+psycopg2://user:password@localhost:5432/myfastapidb"
+# model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
 vertexai.init(project=PROJECT_NAME, location=LOCATION)
 model = GenerativeModel(os.getenv("FINE_TUNED_MODEL"))
 aiplatform.init(
@@ -60,13 +69,12 @@ aiplatform.init(
 )
 
 # FastAPI app instance
-
 app = FastAPI(debug=True)
 
 # Middleware for CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ALLOWED_DOMAINS", "*").split(","),  # Ensure default
+    allow_origins=os.getenv("CORS_ALLOWED_DOMAINS", "*").split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -95,11 +103,16 @@ def call_function_from_file(folder_path, module_name, function_name):
     return func()
 
 
-@app.get("/pre_user_prompt", response_class=JSONResponse)
-async def pre_user_prompt():
+@app.post("/pre_user_prompt", response_class=JSONResponse)
+async def pre_user_prompt(request: Request):
+    data = await request.json()
+    session_id = data.get("session_id")
     """Fetch suggested prompts."""
-    suggested_prompts = sample(prompt_list, min(3, len(prompt_list)))  # Fix for <3 prompts
-    return JSONResponse(suggested_prompts)
+    suggested_prompts = sample(prompt_list, min(4, len(prompt_list)))
+    prompt_history = response_logger.select_all_messages(session_id)
+    return {"suggested_prompts": suggested_prompts, 
+            "prompt_history": prompt_history
+        }
 
 
 @app.get("/post_response", response_class=JSONResponse)
@@ -116,12 +129,12 @@ async def post_response(keyword: str):
 
 @app.get("/", response_class=HTMLResponse)
 async def chat_view(request: Request):
-    """Render chat UI."""
     return templates.TemplateResponse("chat.html", {"request": request})
 
 
 '''
 Generate answer with genai(kai_fine_2_5_v2) client from Vertex AI
+return dict
 '''
 def generate_from(user_prompt, project_id, location, endpoint_id):
     client = genai.Client(
@@ -173,17 +186,14 @@ def generate_from(user_prompt, project_id, location, endpoint_id):
         config = generate_content_config,
         ):
         try:
-            # Get text part(s) from the candidate
             parts = chunk.candidates[0].content.parts
             for part in parts:
                 if hasattr(part, "text"):
                     full_text += part.text
 
-            # Get model_version once
             if model_version is None and hasattr(chunk, "model_version"):
                 model_version = chunk.model_version
 
-            # Get token count if it's in usage_metadata
             if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
                 usage = chunk.usage_metadata
                 if hasattr(usage, "total_token_count") and usage.total_token_count:
@@ -192,14 +202,12 @@ def generate_from(user_prompt, project_id, location, endpoint_id):
         except Exception as e:
             print("Error while parsing chunk:", e)
 
-    # Final parsed dictionary
     parsed_output = {
         "text": full_text.strip(),
         "model_version": model_version,
         "total_token_count": total_token_count
     }
     return parsed_output
-
 
 
 @app.post("/chatbot")
@@ -209,93 +217,21 @@ async def chatbot(request: Request):
     endpoint_id = os.getenv("ENDPOINT_ID")
     
     data = await request.json()
-    user_message, history, tokens = data.get("prompt"), data.get("history"), data.get("tokens")
-
-    llm = "gemini-2.5-flash" # specify the model you want to use
-    provider = "gemini" # specify the provider for this model
-    tokenizer = tiktoken.get_encoding("cl100k_base") # specify the tokenizer to use for this model
-    tokenizer_function = lambda text: len(tokenizer.encode(text)) # specify the tokenizing function to use
-    # with open("initial-prompt.txt", "r") as prompt_file:
-    #     initial_prompt = prompt_file.read().strip()
-
-    # specify the completion function you'd like to use
-    def completion_function(api_key: str, 
-                   initial_prompt: Optional[str],
-                   user_message: str, 
-                   conversation_history: str, 
-                   max_tokens: int, 
-                   temperature: float,
-                   model_name: str):
-        
-        '''
-        Genimi Model from Vertex AI
-        '''
-        full_prompt = f"""You are a helpful assistant that provides resaurant names and menu items to questions for users in Seattle. 
-        Answer the following user question using ONLY the relevant restaurant and product details provided below. Be specific, concise, and friendly. 
-        User Question:
-        {user_message}
-        """
-
-
-        response = generate_from(full_prompt, project_id, location, endpoint_id)
-        print(response)
-        print(history)
-        return response
-
-        # if provider == "openai":
-        #     client = OpenAI(api_key=api_key)
-
-        #     try:
-        #         response = client.chat.completions.create(
-        #             model=model_name,
-        #             messages=[
-        #                 {"role": "system", "content": initial_prompt},
-        #                 {"role": "user", "content": conversation_history + user_message}
-        #             ],
-        #             max_tokens=max_tokens,
-        #             temperature=temperature,
-        #         )
-
-        #         return response.choices[0].message.content.strip()
-            
-        #     except Exception as e:
-        #         raise e
-        # else:
-
-        # aiplatform.init(project=PROJECT_ID, location=LOCATION)
-        # model = GenerativeModel(model_name=ENDPOINT_ID)
-        # response = model.generate_content(user_message)
-        # return response.candidates[0].content.parts[0].text
-    
-        #     import google.generativeai as genai
-
-        #     model = genai.GenerativeModel(model_name)
-        #     genai.configure(api_key=api_key)
-        #     prompt = user_message
-            
-        #     response = model.generate_content(prompt)
-
-        #     # Extract the response text
-        #     return response.text
-        
+    user_message, history, tokens, session_id = data.get("prompt"), data.get("history"), data.get("tokens") , '12344412'       
 
     full_prompt = f"""You are a helpful assistant that provides resaurant names and menu items to questions for users in Seattle. 
         Answer the following user question using ONLY the relevant restaurant and product details provided below. Be specific, concise, and friendly. 
         User Question:
         {user_message}
         """
+    response_logger.insert_message(session_id, "user", user_message)
 
     response = generate_from(full_prompt, project_id, location, endpoint_id)
-    # message_logger.log_message(user_message)
+    response_dict = response
 
-    return {'prompt': full_prompt, 'kai_response': response, 'history': 'response', 'tokens': 'localNumTokens'}
+    message_logger.log_message(user_message, session_id)
 
-    try:
-        # chat_response = completion_function(user_message=user_message)
-        ai_configurator.set_model(provider, llm, tokenizer_function, completion_function, use_initial_prompt=True)
-        chat_response = ai_configurator.process_response(history, user_message, tokens)  # Fixed call
-        # print("chat_response:", chat_response)
-        return chat_response
-    except Exception as e:
-        logger.error(f"Error in chatbot processing: {e}")
-        return JSONResponse({"response": "Sorry... An error occurred."}, status_code=500)
+    # response_logger.create_table()
+    response_logger.insert_message(session_id, "bot", response_dict['text'])
+
+    return {'prompt': full_prompt, 'user_prompt': user_message, 'kai_response': response_dict['text'], 'model_version': response_dict['model_version'], 'history': response_logger.select_all_messages(), 'tokens': response_dict['total_token_count']}

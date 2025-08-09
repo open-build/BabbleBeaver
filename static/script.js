@@ -1,32 +1,45 @@
 $(document).ready(function () {
-  // get rid of chat history and number of tokens on page refresh
-  sessionStorage.removeItem("messageHistory"); 
-  sessionStorage.removeItem("totalUsedTokens");
+  // sessionStorage.removeItem("messageHistory"); 
+  // sessionStorage.removeItem("totalUsedTokens");
 
   const suggestedPrompts = $('#suggested-prompts');
+  const chatForm = $('#chat-form');
+  const chatMessages = $('#chat-messages');
+  const userInput = $('#user-input');
+  const submitButton = $('#submit-input');
 
   $.ajax({
     url: "/pre_user_prompt",
-    type: "GET",
+    type: "POST",
+    data: JSON.stringify({session_id: '12344412'}), // pass session_id from react comp
     success: function(data) {
-      for (let i = 0; i < data.length; i++) {
+      prompt_history = data['prompt_history']
+      suggested_prompts = Array(data['suggested_prompts'])
+      for (let i = 0; i < suggested_prompts[0].length; i++) {
         const btnElem = $('<button class="suggested-prompt-btn"></button>');
-        btnElem.text(`${data[i]}`);
+        btnElem.text(`${suggested_prompts[0][i]}`);
         suggestedPrompts.append(btnElem);
+      }
+
+      const messageUserContainer = $('<div class="message user-message"></div>');
+      const messageBotContainer = $('<div class="message bot-message"></div>');
+      for (let i = 0; i < prompt_history.length; i++) {
+        console.log(prompt_history[i])
+        if (prompt_history[i].sender = 'user')
+          messageUserContainer.append($('<p></p>').text(prompt_history[i].message));
+          chatMessages.append(messageUserContainer);
+        if (prompt_history[i].sender = 'bot')
+          messageBotContainer.append($('<p></p>').text(prompt_history[i].message));
+          chatMessages.append(messageBotContainer);
       }
     },
     error: function(error) {
       console.log(`Error: ${error}`)
     }
   })
-
-  const chatForm = $('#chat-form');
-  const chatMessages = $('#chat-messages');
-  const userInput = $('#user-input');
-  const submitButton = $('#submit-input');
   
-  // delegating event to parent element since the buttons were dynamically generated
   suggestedPrompts.on("click", (e) => {
+    console.log(e.target.textContent)
     userInput.val(e.target.textContent);
     submitButton.click();
   })
@@ -46,7 +59,6 @@ $(document).ready(function () {
     messageContainer.append(messageText);
     chatMessages.append(messageContainer);
 
-    // let's add the load dot animation to signal thinking....
     chatMessages.append('<div id="loader" class="loader"></div>')
 
     userInput.val('');
@@ -58,7 +70,7 @@ $(document).ready(function () {
     }
 
     disable_form(true)
-    let sessionMessageHistory = sessionStorage.getItem("messageHistory");
+    let sessionMessageHistory = sessionStorage.getItem("history");
     let userMessages = sessionMessageHistory ? JSON.parse(sessionMessageHistory)["user"] : [];
     let botMessages = sessionMessageHistory ? JSON.parse(sessionMessageHistory)["bot"] : [];
     let localMessageHistory = {user: userMessages, bot: botMessages}
@@ -72,11 +84,16 @@ $(document).ready(function () {
       contentType: 'application/json',
       data: JSON.stringify({prompt: userMessage, history: localMessageHistory, tokens: localNumTokens}),
       success: function (data) {
-        console.log("data: ", data.kai_response);
-        const {response: botMessage, usedTokens, updatedHistory} = data;
-        // console.log("response: ", response);
+        console.log("data: ", data);
+        const botMessage = data.history;
+        const kaiMessage = data.kai_response;
+        const rawPrompt = data.user_prompt;
+        const fullPrompt = data.prompt;
+        const usedTokens = data.tokens;
+        const modelVersion = data.model_version;
+        const updatedHistory = data.model_version;
+
         if (botMessage !== "Sorry... An error occurred.") {
-          // update client side with number of used tokens(included tokens used for the last user query and bot response)
           sessionStorage.setItem("totalUsedTokens", JSON.stringify(usedTokens));
           
           // if chat history was truncated because of token limit exceeded, needs to be updated on client side as well
@@ -84,15 +101,10 @@ $(document).ready(function () {
             localMessageHistory = updatedHistory;
             sessionStorage.setItem("messageHistory", JSON.stringify(localMessageHistory));
           }
-          
-          // update chat history
-          // localMessageHistory["user"].push(userMessage);
-          // localMessageHistory["bot"].push(botMessage);
-          // sessionStorage.setItem("messageHistory", JSON.stringify(localMessageHistory));
         }
 
         const messageContainer = $('<div class="message bot-message"></div>');
-        const messageText = $('<p></p>').text(data.kai_response.text);
+        const messageText = $('<p></p>').text(data.kai_response);
         messageContainer.append(messageText);
         chatMessages.append(messageContainer);
 
@@ -100,7 +112,6 @@ $(document).ready(function () {
       },
       error: function (error) {
         console.error('Error:', error);
-        console.log("HERE")
       },
       complete: function() {
         disable_form(false)

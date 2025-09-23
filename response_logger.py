@@ -1,10 +1,26 @@
-import uuid
+import os
 from datetime import datetime
 import psycopg2
 from psycopg2 import sql
+from google.cloud.sql.connector import Connector
+
+connector = Connector()
+CREDENTIALS_DIR = os.path.join('./', 'credentials')
+postgres_password = os.path.join('PG_PASS')
+postgres_username = os.path.join('PG_USER')
+# SERVER_CA_PATH = os.path.join(CREDENTIALS_DIR, 'server-ca.pem')
+# CLIENT_CERT_PATH = os.path.join(CREDENTIALS_DIR, 'client-cert.pem')
+# CLIENT_KEY_PATH = os.path.join(CREDENTIALS_DIR, 'client-key.pem')
+
+
+
+# add user_name and password to ops yaml
+
+
+
 
 class ChatLogger:
-    def __init__(self, db_name="chat_db", user="drunradmin", password="drunrpass", host='localhost', port=5432, table_name='messages'):
+    def __init__(self, db_name="babble", user=postgres_username, password=postgres_password, host='localhost', port=5432, table_name='user_chats'):
         self.db_name = db_name
         self.user = user
         self.password = password
@@ -12,14 +28,25 @@ class ChatLogger:
         self.port = port
         self.table_name = table_name
 
-        self.conn = psycopg2.connect(
-            dbname=self.db_name,
-            user=self.user,
-            password=self.password,
-            host=self.host,
-            port=self.port
+        # self.conn = psycopg2.connect(
+        #     dbname=self.db_name,
+        #     user=self.user, 
+        #     password=self.password,
+        #     host=self.host,
+        #     port=self.port,
+        # )
+
+        self.conn = connector.connect(
+            "drunr-prod:us-west1:drunr"
+            "pg8000", # driver
+            user=user,
+            password=password,
+            db=db_name
         )
+
         # self.create_table()
+        # self.conn.close()
+
 
     def create_table(self):
         with self.conn.cursor() as cur:
@@ -33,11 +60,12 @@ class ChatLogger:
                     timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
                 );
             """))
-        self.conn.commit()
+        # self.conn.commit()
+
 
     def select_all_messages(self, session_id):
         data_list = []
-        print(session_id)
+        print("session_id: ", session_id)
         with self.conn.cursor() as cur:
             query = sql.SQL("SELECT * FROM {} WHERE session_id = {} ").format(sql.Identifier(self.table_name), sql.Literal(session_id))
             cur.execute(query)
@@ -52,6 +80,7 @@ class ChatLogger:
                 data_list.append(row_dict)
             return data_list
 
+
     def insert_message(self, session_id, sender, message):
         if sender not in ('user', 'bot'):
             raise ValueError("Sender must be 'user' or 'bot'")
@@ -62,6 +91,7 @@ class ChatLogger:
                 VALUES (%s, %s, %s, %s);
             """), (str(session_id), sender, message, datetime.now()))
         self.conn.commit()
+
 
     def close(self):
         self.conn.close()

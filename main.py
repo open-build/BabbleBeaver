@@ -1,4 +1,3 @@
-
 # main.py
 from http.client import HTTPException
 import os
@@ -110,6 +109,7 @@ async def pre_user_prompt(request: Request):
     """Fetch suggested prompts."""
     suggested_prompts = sample(prompt_list, min(4, len(prompt_list)))
     prompt_history = response_logger.select_all_messages(session_id)
+    # print(prompt_history)
     return {"suggested_prompts": suggested_prompts, 
             "prompt_history": prompt_history
         }
@@ -224,14 +224,16 @@ async def chatbot(request: Request):
         User Question:
         {user_message}
         """
+    
+    # Record bot response
     response_logger.insert_message(session_id, "user", user_message)
 
     response = generate_from(full_prompt, project_id, location, endpoint_id)
     response_dict = response
 
     message_logger.log_message(user_message, session_id)
-
-    # response_logger.create_table()
+    
     response_logger.insert_message(session_id, "bot", response_dict['text'])
 
-    return {'prompt': full_prompt, 'user_prompt': user_message, 'kai_response': response_dict['text'], 'model_version': response_dict['model_version'], 'history': response_logger.select_all_messages(), 'tokens': response_dict['total_token_count']}
+    return {'prompt': full_prompt, 'user_prompt': user_message, 'kai_response': response_dict['text'], 'model_version': response_dict['model_version'], 'history': "response_logger.select_all_messages(session_id)", 'tokens': response_dict['total_token_count']}
+

@@ -21,16 +21,19 @@ $(document).ready(function () {
         suggestedPrompts.append(btnElem);
       }
 
-      const messageUserContainer = $('<div class="message user-message"></div>');
-      const messageBotContainer = $('<div class="message bot-message"></div>');
       for (let i = 0; i < prompt_history.length; i++) {
-        console.log(prompt_history[i])
-        if (prompt_history[i].sender = 'user')
+        const messageUserContainer = $('<div class="message user-message"></div>');
+        const messageBotContainer = $('<div class="message bot-message"></div>');
+        if (prompt_history[i].sender === 'user') {
+          console.log("user: ", prompt_history[i].message)
           messageUserContainer.append($('<p></p>').text(prompt_history[i].message));
           chatMessages.append(messageUserContainer);
-        if (prompt_history[i].sender = 'bot')
+        }
+        if (prompt_history[i].sender === 'bot') {
+          console.log("bot: ", prompt_history[i].message)
           messageBotContainer.append($('<p></p>').text(prompt_history[i].message));
           chatMessages.append(messageBotContainer);
+        }
       }
     },
     error: function(error) {
@@ -53,11 +56,6 @@ $(document).ready(function () {
     if (userMessage === '') return;
 
     suggestedPrompts.empty();
-
-    const messageContainer = $('<div class="message user-message"></div>');
-    const messageText = $('<p></p>').text(userMessage);
-    messageContainer.append(messageText);
-    chatMessages.append(messageContainer);
 
     chatMessages.append('<div id="loader" class="loader"></div>')
 
@@ -97,18 +95,18 @@ $(document).ready(function () {
           sessionStorage.setItem("totalUsedTokens", JSON.stringify(usedTokens));
           
           // if chat history was truncated because of token limit exceeded, needs to be updated on client side as well
-          if (updatedHistory !== null) {
-            localMessageHistory = updatedHistory;
-            sessionStorage.setItem("messageHistory", JSON.stringify(localMessageHistory));
-          }
+          // if (updatedHistory !== null) {
+          //   localMessageHistory = updatedHistory;
+          //   sessionStorage.setItem("messageHistory", JSON.stringify(localMessageHistory));
+          // }
         }
 
-        const messageContainer = $('<div class="message bot-message"></div>');
-        const messageText = $('<p></p>').text(data.kai_response);
-        messageContainer.append(messageText);
-        chatMessages.append(messageContainer);
-
-        chatMessages.scrollTop(chatMessages.prop('scrollHeight'));
+        const messageUserContainer = $('<div class="message user-message"></div>');
+        const messageBotContainer = $('<div class="message bot-message"></div>');
+        messageUserContainer.append($('<p></p>').text(rawPrompt));
+        chatMessages.append(messageUserContainer);
+        messageBotContainer.append($('<p></p>').text(kaiMessage));
+        chatMessages.append(messageBotContainer);
       },
       error: function (error) {
         console.error('Error:', error);

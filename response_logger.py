@@ -19,21 +19,21 @@ class ChatLogger:
         self.port = port
         self.table_name = table_name
 
-        self.conn = psycopg2.connect(
-            dbname=self.db_name,
-            user=self.user, 
-            password="drunr_pass",
-            host=self.host,
-            port=self.port,
-        )
-
-        # self.conn = connector.connect(
-        #     "drunr-prod:us-west1:drunr"
-        #     "pg8000", # driver
-        #     user=user,
-        #     password=password,
-        #     db=db_name
+        # self.conn = psycopg2.connect(
+        #     dbname=self.db_name,
+        #     user=self.user, 
+        #     password="drunr_pass",
+        #     host=self.host,
+        #     port=self.port,
         # )
+
+        self.conn = connector.connect(
+            "drunr-prod:us-west1:drunr"
+            "pg8000", # driver
+            user=user,
+            password=password,
+            db=db_name
+        )
 
         self.create_table()
         # self.conn.close()

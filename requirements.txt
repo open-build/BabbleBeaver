@@ -13,7 +13,7 @@ orjson==3.9.1
 pydantic==1.10.11
 python-dotenv==1.0.0
 python-multipart==0.0.6
-PyYAML==6.0
+PyYAML==6.0.1
 sniffio==1.3.0
 starlette
 typing_extensions

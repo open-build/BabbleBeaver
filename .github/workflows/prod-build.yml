@@ -49,13 +49,3 @@ jobs:
     - name: Push to Google Artifact Registry
       run: docker push $IMAGE_NAME:latest
 
-    - name: Deploy on Kapstan
-      id: Kapstan
-      uses: kapstan-io/deployment-action@latest
-      with: 
-        application_name: babblebeaver
-        image_repository_name: ${{ env.IMAGE_NAME }}
-        image_tag: latest
-        kapstan_api_key: ${{ secrets.PROD_KAPSTAN_KEY }}
-        wait_for_deployment: false
-

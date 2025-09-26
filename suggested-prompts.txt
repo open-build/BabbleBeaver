@@ -1,50 +1,21 @@
-Explain the theory of relativity in simple terms.
-What are the benefits of meditation?
-How do I start investing in stocks?
-Write a motivational speech for students.
-What are the best practices for remote work?
-Describe the process of photosynthesis.
-What are the key differences between Python and JavaScript?
-How can I improve my public speaking skills?
-What are the top tourist attractions in Paris?
-Create a meal plan for a week on a budget.
-Explain the basics of blockchain technology.
-What are some effective time management strategies?
-How do I write a cover letter for a job application?
-Recommend books for learning data science.
-What are the causes and effects of climate change?
-Give me a summary of 'To Kill a Mockingbird'.
-How do I set up a home garden?
-What are the symptoms and treatments for anxiety?
-Describe the cultural significance of the Olympic Games.
-What are some tips for learning a new language?
-How do I create a successful blog?
-Explain the different types of renewable energy sources.
-What are some healthy snacks for kids?
-How do I write a business plan?
-What are the benefits of regular exercise?
-Describe the main plot of '1984' by George Orwell.
-What are the steps to start a small business?
-How do I create a budget for personal finances?
-What are the most common programming languages used in web development?
-Give me some tips for reducing stress.
-What are the key components of a marketing strategy?
-Explain the process of human digestion.
-How do I prepare for a job interview?
-What are the benefits of a plant-based diet?
-Describe the major events of World War II.
-How do I improve my writing skills?
-What are some popular outdoor activities?
-Explain the concept of artificial intelligence.
-What are the best ways to save money?
-How do I create a LinkedIn profile?
-What are the key elements of a successful resume?
-Describe the process of the water cycle.
-What are some strategies for effective teamwork?
-How do I set and achieve personal goals?
-What are the major religions in the world?
-How do I build a strong professional network?
-What are the benefits of learning to code?
-Describe the different stages of sleep.
-How do I create a sustainable lifestyle?
-What are some effective study techniques for exams
+What are the best healthy restaurants in Seattle?
+Where can I get organic food near Pike Place Market?
+Are there gluten-free restaurants in Seattle?
+Who delivers healthy food in Seattle?
+Where can I get a healthy breakfast in Capitol Hill?
+What are some highly-rated healthy restaurants in Downtown Seattle?
+Where can I find vegetarian-friendly restaurants with healthy options in Ballard?
+Are there any healthy restaurants in Seattle that cater to specific diets like Paleo or Keto?
+Which Seattle neighborhoods are known for having a good concentration of healthy dining spots?
+Where can I find restaurants that prioritize locally sourced, organic ingredients in Seattle?
+Do any healthy Seattle restaurants offer farm-to-table menus?
+Where can I find grass-fed or pasture-raised meat options in Seattle restaurants or markets?
+Where can I find a healthy lunch spot with quick service in South Lake Union?
+What are some good options for a healthy dinner in Seattle, suitable for a date night?
+Are there healthy meal prep services in Seattle that deliver?
+Which healthy restaurants in Seattle offer takeout or curbside pickup?
+Where can I find healthy brunch options in Seattle, especially on weekends?
+Are there any healthy late-night food options in Seattle?
+Which Asian restaurants in Seattle offer healthy, fresh options?
+Where can I find healthy Mediterranean food in Seattle?
+Are there Mexican restaurants in Seattle that offer healthier, less-oily options?

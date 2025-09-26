@@ -58,31 +58,12 @@
             66% {box-shadow: 20px 0 #0002,-20px 0 #000; background: #0002}
             100%{box-shadow: 20px 0 #0002,-20px 0 #000; background: #000 }
         }
-        .credentials-warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeeba;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="chat-container">
             <h1 class="text-center">BabbleBeaver Chat Tester</h1>
-            
-            {% if upload_html %}
-                <div class="credentials-warning">
-                    {{ upload_html|safe }}
-                    <form action="/upload_credentials" enctype="multipart/form-data" method="post" style="margin-top:10px;">
-                        <input name="file" type="file" accept=".json" required>
-                        <button type="submit" class="btn btn-warning btn-sm">Upload Credentials</button>
-                    </form>
-                </div>
-            {% endif %}
             
             <div id="suggested-prompts"></div>
             <div id="chat-messages"></div>

@@ -24,7 +24,7 @@ class MessageLogger:
                 )
             """)
 
-    def log_message(self, message):
+    def log_message(self, message, type):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("INSERT INTO messages (message) VALUES (?)", (message,))

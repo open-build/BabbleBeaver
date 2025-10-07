@@ -7,7 +7,7 @@ on:
 
 env:
   REGION: us-west1
-  IMAGE_NAME: ${{ vars.PROD_DOCKER_IMAGE }}
+  IMAGE_NAME: us-west1-docker.pkg.dev/drunr-prod/drunr/prod-babblebeaver
 
 jobs:
   build:
@@ -48,4 +48,3 @@ jobs:
     # Push docker image to Artifact registry
     - name: Push to Google Artifact Registry
       run: docker push $IMAGE_NAME:latest
-

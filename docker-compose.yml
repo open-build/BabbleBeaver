@@ -11,5 +11,10 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - INITIAL_PROMPT_FILE_PATH=${INITIAL_PROMPT_FILE_PATH}
       - HUGGINGFACE_AUTH_TOKEN=${HUGGINGFACE_AUTH_TOKEN}
-      - CORS_ALLOWED_DOMAINS:'["http://localhost","https://localhost","http://localhost:3000","https://localhost:3000"]'
-
+      - CORS_ALLOWED_DOMAINS='["http://localhost","https://localhost","http://localhost:3000","https://localhost:3000"]'
+      - PG_USER=${PG_USER}
+      - PG_PASS=${PG_PASS}
+      - PROJECT_ID=${PROJECT_ID}
+      - PROJECT_NAME=${PROJECT_NAME}
+      - LOCATION=us-west1
+      - FINE_TUNED_MODEL=gemini-2.5-flash

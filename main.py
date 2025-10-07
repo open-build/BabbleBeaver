@@ -23,8 +23,8 @@ from google.cloud import aiplatform
 import vertexai
 from vertexai.preview.generative_models import  GenerativeModel
 from google.cloud import aiplatform
-from google import genai
-from google.genai import types
+import google.generativeai as genai
+from google.generativeai import types
 
 
 # Configure logging

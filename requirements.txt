@@ -37,3 +37,6 @@ scipy
 matplotlib
 sqlalchemy
 psycopg2-binary
+cloud-sql-python-connector[pg8000]
+google-auth
+google-auth-oauthlib

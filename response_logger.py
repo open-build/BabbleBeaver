@@ -1,14 +1,20 @@
 import os
 from datetime import datetime
-import psycopg2
 from psycopg2 import sql
+
+# Set up Google Cloud credentials
+credentials_file = os.path.join('./', 'credentials.json')
+
+# Set environment variable for Google Cloud authentication
+if os.path.exists(credentials_file):
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_file
+
+# Import after setting credentials
 from google.cloud.sql.connector import Connector
 
-connector = Connector()
-CREDENTIALS_DIR = os.path.join('./', 'credentials')
-postgres_password = os.path.join('PG_PASS')
-postgres_username = os.path.join('PG_USER')
-
+# Get database credentials from environment variables
+postgres_password = os.getenv('PG_PASS')
+postgres_username = os.getenv('PG_USER')
 
 class ChatLogger:
     def __init__(self, db_name="babble", user="drunr_admin", password=postgres_password, host='localhost', port=5432, table_name='user_chats'):
@@ -18,28 +24,30 @@ class ChatLogger:
         self.host = host
         self.port = port
         self.table_name = table_name
-
-        # self.conn = psycopg2.connect(
-        #     dbname=self.db_name,
-        #     user=self.user, 
-        #     password="drunr_pass",
-        #     host=self.host,
-        #     port=self.port,
-        # )
-
-        self.conn = connector.connect(
-            "drunr-prod:us-west1:drunr"
-            "pg8000", # driver
-            user=user,
-            password=password,
-            db=db_name
-        )
-
-        self.create_table()
-        # self.conn.close()
-
+        
+        # Initialize connector and connection
+        try:
+            self.connector = Connector()
+            
+            # Connect to Cloud SQL instance
+            self.conn = self.connector.connect(
+                "drunr-prod:us-west1:drunr",
+                "pg8000",
+                user=user,
+                password=password,
+                db=db_name
+            )
+            
+            self.create_table()
+        except Exception as e:
+            print(f"Database connection failed: {e}")
+            # Fallback to None - you may want to implement a fallback database
+            self.conn = None
+            self.connector = None
 
     def create_table(self):
+        if not self.conn:
+            return
         with self.conn.cursor() as cur:
             cur.execute(sql.SQL(f"""
                 DROP TABLE IF EXISTS {self.table_name};
@@ -53,8 +61,9 @@ class ChatLogger:
             """))
         self.conn.commit()
 
-
     def select_all_messages(self, session_id):
+        if not self.conn:
+            return []
         data_list = []
         print("session_id: ", session_id)
         with self.conn.cursor() as cur:
@@ -71,8 +80,11 @@ class ChatLogger:
                 data_list.append(row_dict)
             return data_list
 
-
     def insert_message(self, session_id, sender, message):
+        if not self.conn:
+            print("No database connection - message not logged")
+            return
+            
         if sender not in ('user', 'bot'):
             raise ValueError("Sender must be 'user' or 'bot'")
 
@@ -83,7 +95,8 @@ class ChatLogger:
             """), (str(session_id), sender, message, datetime.now()))
         self.conn.commit()
 
-
     def close(self):
-        self.conn.close()
-
+        if self.conn:
+            self.conn.close()
+        if self.connector:
+            self.connector.close()

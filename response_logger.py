@@ -1,98 +1,63 @@
 import os
+import uuid
 from datetime import datetime
-import psycopg2
-from psycopg2 import sql
-from google.cloud.sql.connector import Connector
 
-connector = Connector()
-CREDENTIALS_DIR = os.path.join('./', 'credentials')
-postgres_password = os.path.join('PG_PASS')
-postgres_username = os.path.join('PG_USER')
-# SERVER_CA_PATH = os.path.join(CREDENTIALS_DIR, 'server-ca.pem')
-# CLIENT_CERT_PATH = os.path.join(CREDENTIALS_DIR, 'client-cert.pem')
-# CLIENT_KEY_PATH = os.path.join(CREDENTIALS_DIR, 'client-key.pem')
+from sqlalchemy import create_engine, Column, String, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
+Base = declarative_base()
+DATABASE_URL = os.getenv("DATABASE_URL") or "postgresql://postgres:password@localhost:5432/mydatabase"
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Define the ChatHistory model
+class ChatHistory(Base):
+    __tablename__ = "user_chats"
+    session_id = Column(String, primary_key=True, index=True)
+    sender = Column(String)
+    message = Column(String, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
 
-# add user_name and password to ops yaml
-
-
-
-
+# ChatLogger class for inserting and selecting chat history
 class ChatLogger:
-    def __init__(self, db_name="babble", user=postgres_username, password=postgres_password, host='localhost', port=5432, table_name='user_chats'):
-        self.db_name = db_name
-        self.user = user
-        self.password = password
-        self.host = host
-        self.port = port
+
+    @staticmethod
+    def get_db():
+        db = SessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    def __init__(self, table_name='user_chats'):
         self.table_name = table_name
 
-        # self.conn = psycopg2.connect(
-        #     dbname=self.db_name,
-        #     user=self.user, 
-        #     password=self.password,
-        #     host=self.host,
-        #     port=self.port,
-        # )
-
-        self.conn = connector.connect(
-            "drunr-prod:us-west1:drunr"
-            "pg8000", # driver
-            user=user,
-            password=password,
-            db=db_name
-        )
-
-        # self.create_table()
-        # self.conn.close()
-
-
-    def create_table(self):
-        with self.conn.cursor() as cur:
-            cur.execute(sql.SQL(f"""
-                DROP TABLE IF EXISTS {self.table_name};
-                CREATE TABLE IF NOT EXISTS {self.table_name} (
-                    id SERIAL PRIMARY KEY,
-                    session_id TEXT NOT NULL,
-                    sender VARCHAR(10) NOT NULL CHECK (sender IN ('user', 'bot')),
-                    message TEXT NOT NULL,
-                    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-                );
-            """))
-        # self.conn.commit()
-
+        # Create table(s)
+        Base.metadata.create_all(bind=engine)
 
     def select_all_messages(self, session_id):
-        data_list = []
-        print("session_id: ", session_id)
-        with self.conn.cursor() as cur:
-            query = sql.SQL("SELECT * FROM {} WHERE session_id = {} ").format(sql.Identifier(self.table_name), sql.Literal(session_id))
-            cur.execute(query)
-
-            column_names = [desc[0] for desc in cur.description]
-            rows = cur.fetchall()
-
-            for row in rows:
-                row_dict = {}
-                for i, column_name in enumerate(column_names):
-                    row_dict[column_name] = row[i]
-                data_list.append(row_dict)
-            return data_list
-
+        print("session_id:", session_id)
+        db = SessionLocal()
+        try:
+            records = db.query(ChatHistory).filter(ChatHistory.session_id == session_id).all()
+            print("records:", records)
+            return records
+        finally:
+            db.close()
 
     def insert_message(self, session_id, sender, message):
-        if sender not in ('user', 'bot'):
-            raise ValueError("Sender must be 'user' or 'bot'")
-
-        with self.conn.cursor() as cur:
-            cur.execute(sql.SQL(f"""
-                INSERT INTO {self.table_name} (session_id, sender, message, timestamp)
-                VALUES (%s, %s, %s, %s);
-            """), (str(session_id), sender, message, datetime.now()))
-        self.conn.commit()
-
-
-    def close(self):
-        self.conn.close()
-
+        db = SessionLocal()
+        try:
+            record = ChatHistory(
+                session_id=session_id,
+                sender=sender,
+                message=message,
+                timestamp=datetime.utcnow()
+            )
+            db.add(record)
+            db.commit()
+            db.refresh(record)
+            print(f"✅ Stored chat data for {session_id} - {sender}")
+        finally:
+            db.close()

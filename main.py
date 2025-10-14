@@ -24,12 +24,6 @@ from google.cloud import aiplatform
 from google import genai
 from google.genai import types
 
-# DB
-import psycopg2
-from psycopg2 import sql
-from psycopg2.extras import Json
-import databases
-
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
@@ -47,18 +41,11 @@ try:
 except FileNotFoundError:
     prompt_list = []
 
-# Google Vertex AI Authentication, uvicorn main:app --reload      
-# os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 PROJECT_ID = os.getenv("PROJECT_ID")
 PROJECT_NAME = os.getenv("PROJECT_NAME")
 LOCATION = os.getenv("LOCATION")
 ENDPOINT_ID = os.getenv("ENDPOINT_ID")
 
-
-# DATABASE_URL = "postgresql://user:password@localhost/dbname"
-# database = databases.Database(DATABASE_URL)
-# DATABASE_URL: str = "postgresql+psycopg2://user:password@localhost:5432/myfastapidb"
-# model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 vertexai.init(project=PROJECT_NAME, location=LOCATION)
 model = GenerativeModel(os.getenv("FINE_TUNED_MODEL"))
@@ -102,17 +89,28 @@ def call_function_from_file(folder_path, module_name, function_name):
     return func()
 
 
+def serialize_chat(chat):
+    return {
+        # "id": chat.id,
+        "session_id": chat.session_id,
+        "sender": chat.sender,
+        "message": chat.message,
+        "timestamp": chat.timestamp.isoformat() if chat.timestamp else None
+    }
+
+
 @app.post("/pre_user_prompt", response_class=JSONResponse)
 async def pre_user_prompt(request: Request):
     data = await request.json()
     session_id = data.get("session_id")
-    """Fetch suggested prompts."""
     suggested_prompts = sample(prompt_list, min(4, len(prompt_list)))
-    prompt_history = response_logger.select_all_messages(session_id)
-    # print(prompt_history)
-    return {"suggested_prompts": suggested_prompts, 
-            "prompt_history": prompt_history
-        }
+    chat_records = response_logger.select_all_messages(session_id)
+    prompt_history = [serialize_chat(chat) for chat in chat_records]
+    return {
+        "suggested_prompts": suggested_prompts,
+        "prompt_history": prompt_history
+    }
+
 
 
 @app.get("/post_response", response_class=JSONResponse)
@@ -225,7 +223,8 @@ async def chatbot(request: Request):
         {user_message}
         """
     
-    # Record bot response
+    print(user_message)
+
     response_logger.insert_message(session_id, "user", user_message)
 
     response = generate_from(full_prompt, project_id, location, endpoint_id)

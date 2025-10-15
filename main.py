@@ -1,3 +1,5 @@
+# main.py
+from http.client import HTTPException
 import os
 import logging
 import importlib.util
@@ -10,22 +12,18 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-import tiktoken
-import time
-import asyncio
-
+import openai  # Corrected import
 from ai_configurator import AIConfigurator
 from message_logger import MessageLogger
 from response_logger import ChatLogger
 
-from http.client import HTTPException
 from google.cloud import aiplatform
 import vertexai
 from vertexai.preview.generative_models import  GenerativeModel
 from google.cloud import aiplatform
+
 import google.generativeai as genai
 from google.generativeai import types
-
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -48,6 +46,13 @@ ai_configurator = AIConfigurator()
 message_logger = MessageLogger()
 response_logger = ChatLogger()
 
+# Load prompt suggestions
+try:
+    with open("suggested-prompts.txt", "r") as new_file:
+        prompt_list = new_file.readlines()
+except FileNotFoundError:
+    prompt_list = []
+
 PROJECT_ID = os.getenv("PROJECT_ID")
 PROJECT_NAME = os.getenv("PROJECT_NAME")
 LOCATION = os.getenv("LOCATION")
@@ -60,11 +65,21 @@ aiplatform.init(
     location=LOCATION
 )
 
-try:
-    with open("suggested-prompts.txt", "r") as new_file:
-        prompt_list = new_file.readlines()
-except FileNotFoundError:
-    prompt_list = []
+# FastAPI app instance
+app = FastAPI(debug=True)
+
+# Middleware for CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ALLOWED_DOMAINS", "*").split(","),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Static and template mounting
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
 UPLOAD_DIR = "secure_credentials"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -122,17 +137,29 @@ def call_function_from_file(folder_path, module_name, function_name):
         logger.error(f"Function {function_name} not found in {module_name}.py")
     return func
 
+
+def serialize_chat(chat):
+    return {
+        # "id": chat.id,
+        "session_id": chat.session_id,
+        "sender": chat.sender,
+        "message": chat.message,
+        "timestamp": chat.timestamp.isoformat() if chat.timestamp else None
+    }
+
+
 @app.post("/pre_user_prompt", response_class=JSONResponse)
 async def pre_user_prompt(request: Request):
     data = await request.json()
-    print(data)
     session_id = data.get("session_id")
-    """Fetch suggested prompts."""
     suggested_prompts = sample(prompt_list, min(4, len(prompt_list)))
-    prompt_history = response_logger.select_all_messages(session_id)
-    return {"suggested_prompts": suggested_prompts, 
-            "prompt_history": prompt_history
+    chat_records = response_logger.select_all_messages(session_id)
+    prompt_history = [serialize_chat(chat) for chat in chat_records]
+    return {
+        "suggested_prompts": suggested_prompts,
+        "prompt_history": prompt_history
     }
+
 
 @app.get("/post_response", response_class=JSONResponse)
 async def post_response(keyword: str):
@@ -146,17 +173,8 @@ async def post_response(keyword: str):
 
 @app.get("/", response_class=HTMLResponse)
 async def chat_view(request: Request):
-    # provider = os.getenv("PROVIDER", "gemini")
-    # creds_missing = credentials_needed(provider)
-    # upload_html = ""
-    # if creds_missing:
-    #     upload_html = '<div style="color:red;">Google credentials missing. <a href="/upload_credentials">Upload here</a></div>'
-    #     logger.warning("Google credentials missing, prompting user to upload.")
-    # else:
-    #     ensure_google_credentials_env()
-    return templates.TemplateResponse("chat.html", {"request": request, 
-                                                    # "upload_html": upload_html
-                                                    })
+    return templates.TemplateResponse("chat.html", {"request": request})
+
 
 '''
 Generate answer with genai(kai_fine_2_5_v2) client from Vertex AI
@@ -238,16 +256,6 @@ def generate_from(user_prompt, project_id, location, endpoint_id):
 
 @app.post("/chatbot")
 async def chatbot(request: Request):
-    # start_time = time.time()
-    # data = await request.json()
-    # user_message = data.get("prompt")
-    # history = data.get("history")
-    # tokens = data.get("tokens")
-
-    # # Log incoming request data
-    # logger.info(f"Received /chatbot POST: prompt={user_message}, tokens={tokens}, history keys={list(history.keys()) if isinstance(history, dict) else type(history)}")
-
-        
     project_id = os.getenv("PROJECT_ID")
     location = os.getenv("LOCATION")
     endpoint_id = os.getenv("ENDPOINT_ID")
@@ -260,6 +268,8 @@ async def chatbot(request: Request):
         User Question:
         {user_message}
         """
+    
+    print(user_message)
 
     response_logger.insert_message(session_id, "user", user_message)
 
@@ -271,118 +281,3 @@ async def chatbot(request: Request):
     response_logger.insert_message(session_id, "bot", response_dict['text'])
 
     return {'prompt': full_prompt, 'user_prompt': user_message, 'kai_response': response_dict['text'], 'model_version': response_dict['model_version'], 'history': "response_logger.select_all_messages(session_id)", 'tokens': response_dict['total_token_count']}
-
-    # # Validation
-    # if user_message is None or history is None or tokens is None:
-    #     logger.error(f"Missing required fields: prompt={user_message}, history={history}, tokens={tokens}")
-    #     return JSONResponse({"response": "Missing required fields in request."}, status_code=400)
-
-    # provider = os.getenv("PROVIDER", "gemini").lower()
-    # llm = os.getenv("LLM_MODEL", "gemini-2.0-flash")
-    # tokenizer = tiktoken.get_encoding("cl100k_base")
-    # tokenizer_function = lambda text: len(tokenizer.encode(text))
-    # with open("initial-prompt.txt", "r") as prompt_file:
-    #     initial_prompt = prompt_file.read().strip()
-
-    # # Select completion function based on provider
-    # if provider in ["gemini", "vertex", "vertexai"]:
-    #     logger.info("Using Gemini/Vertex AI provider.")
-    #     from google.cloud import aiplatform
-    #     import vertexai
-    #     from vertexai.preview.generative_models import GenerativeModel
-
-    #     # Initialize model ONCE at startup (global) for performance
-    #     global gemini_model
-    #     if "gemini_model" not in globals():
-    #         logger.info("Initializing Gemini model at startup.")
-    #         try:
-    #             aiplatform.init(project=os.getenv("PROJECT_ID"), location=os.getenv("LOCATION"))
-    #             gemini_model = GenerativeModel(model_name=os.getenv("ENDPOINT_ID", llm))
-    #         except Exception as e:
-    #             logger.error(f"Failed to initialize Gemini model: {e}")
-    #             return JSONResponse({"response": f"Failed to initialize Gemini model: {e}"}, status_code=500)
-
-    #     def gemini_completion_function(api_key: str, initial_prompt: Optional[str], user_message: str, conversation_history: str, max_tokens: int, temperature: float, model_name: str):
-    #         logger.info("Calling Gemini model for completion.")
-    #         try:
-    #             response = gemini_model.generate_content(user_message)
-    #             logger.info("Gemini model response received.")
-    #             return response.candidates[0].content.parts[0].text
-    #         except Exception as e:
-    #             logger.error(f"Gemini model call failed: {e}")
-    #             return f"Error from Gemini: {e}"
-
-    #     completion_function = gemini_completion_function
-    #     if credentials_needed(provider):
-    #         logger.error("Google Vertex AI credentials missing.")
-    #         return JSONResponse({"response": "Google Vertex AI credentials missing. Please upload them."}, status_code=400)
-
-    # elif provider == "openai":
-    #     logger.info("Using OpenAI provider.")
-    #     import openai
-
-    #     def openai_completion_function(api_key: str, initial_prompt: Optional[str], user_message: str, conversation_history: str, max_tokens: int, temperature: float, model_name: str):
-    #         openai.api_key = api_key
-    #         try:
-    #             logger.info("Calling OpenAI ChatCompletion.")
-    #             response = openai.ChatCompletion.create(
-    #                 model=model_name,
-    #                 messages=[
-    #                     {"role": "system", "content": initial_prompt},
-    #                     {"role": "user", "content": conversation_history + user_message}
-    #                 ],
-    #                 max_tokens=max_tokens,
-    #                 temperature=temperature,
-    #             )
-    #             logger.info("OpenAI response received.")
-    #             return response.choices[0].message.content.strip()
-    #         except Exception as e:
-    #             logger.error(f"OpenAI call failed: {e}")
-    #             return f"Error from OpenAI: {e}"
-
-    #     completion_function = openai_completion_function
-
-    # else:
-    #     logger.error(f"Unknown provider: {provider}")
-    #     return JSONResponse({"response": f"Unknown provider: {provider}"}, status_code=400)
-
-    # message_logger.log_message(user_message)
-
-    # try:
-    #     logger.info("Setting model in AIConfigurator.")
-    #     ai_configurator.set_model(provider, llm, tokenizer_function, completion_function, use_initial_prompt=True)
-
-    #     # Use run_in_executor to avoid blocking event loop for sync code
-    #     loop = asyncio.get_event_loop()
-    #     logger.info("Calling process_response in executor.")
-    #     chat_response = await loop.run_in_executor(
-    #         None, ai_configurator.process_response, history, user_message, tokens
-    #     )
-    #     logger.info(f"process_response returned: {chat_response}")
-
-    #     elapsed = time.time() - start_time
-    #     logger.info(f"/chatbot request processed in {elapsed:.2f} seconds.")
-
-    #     if isinstance(chat_response, dict) and "response" in chat_response:
-    #         # Flatten the response for the frontend
-    #         return JSONResponse({
-    #             "response": chat_response["response"],
-    #             "usedTokens": chat_response.get("usedTokens"),
-    #             "updatedHistory": chat_response.get("updatedHistory")
-    #         })
-    #     else:
-    #         return JSONResponse({"response": chat_response})
-    # except Exception as e:
-        # import traceback
-        # logger.error(f"Error in chatbot processing: {e}\n{traceback.format_exc()}")
-        # return JSONResponse({"response": f"Sorry... An error occurred: {e}"}, status_code=500)
-
-@app.get("/health")
-async def health_check():
-    try:
-        ai_configurator.get_response("health check")
-        logger.info("Health check passed.")
-        return JSONResponse({"status": "healthy"})
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return JSONResponse({"status": "unhealthy", "error": str(e)}, status_code=500)

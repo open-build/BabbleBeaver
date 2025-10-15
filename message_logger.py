@@ -20,6 +20,7 @@ class MessageLogger:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
                     id INTEGER PRIMARY KEY,
+                    type TEXT NOT NULL,
                     message TEXT NOT NULL
                 )
             """)
@@ -27,11 +28,11 @@ class MessageLogger:
     def log_message(self, message, type):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO messages (message) VALUES (?)", (message,))
+            cursor.execute("INSERT INTO messages (message, type) VALUES (?, ?)", (message, type))
             conn.commit()
 
     def retrieve_messages(self):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, message FROM messages")
+            cursor.execute("SELECT id, type, message FROM messages")
             return cursor.fetchall()

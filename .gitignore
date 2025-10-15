@@ -171,6 +171,5 @@ cython_debug/
 
 .env
 
-secure_credentials/*
-
+# asset class
 /assets

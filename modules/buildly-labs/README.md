@@ -24,7 +24,7 @@ When a user message contains a `product_uuid`, the agent:
 4. Enriches the AI prompt with real product data
 5. Returns enhanced response to the user
 
-### 2. Configuration
+## Configuration
 
 Add to your `.env` file:
 
@@ -34,7 +34,16 @@ BUILDLY_AGENT=true
 
 # Optional: Override default API URL
 BUILDLY_API_BASE_URL=https://labs-api.buildly.io
+
+# Required: Django authentication token from Buildly Labs
+BUILDLY_AUTH_TOKEN=your-django-auth-token-here
 ```
+
+**To get your auth token:**
+1. Log in to https://labs.buildly.io
+2. Navigate to your account settings or API section
+3. Copy your Django authentication token
+4. Add it to your `.env` file
 
 ### 3. Usage
 

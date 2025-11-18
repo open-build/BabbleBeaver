@@ -52,12 +52,16 @@ except FileNotFoundError:
     prompt_list = []
 
 # Google Vertex AI Authentication, uvicorn main:app --reload      
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+# Only set GOOGLE_APPLICATION_CREDENTIALS in the process environment
+# when the value is present (avoid assigning None which raises TypeError)
+_google_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+if _google_creds:
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _google_creds
 PROJECT_ID = os.getenv("PROJECT_ID")
 LOCATION = os.getenv("LOCATION")
-ENDPOINT_ID = os.getenv("ENDPOINT_ID")
+VERTEX_MODEL_NAME = os.getenv("VERTEX_MODEL_NAME", "gemini-2.0-flash-exp")  # Default to gemini-2.0-flash-exp
 vertexai.init(project=PROJECT_ID, location=LOCATION)
-model = GenerativeModel('gemini-2.0-flash-lite-001')
+model = GenerativeModel(VERTEX_MODEL_NAME)
 aiplatform.init(
     project=PROJECT_ID,
     location=LOCATION
@@ -176,7 +180,7 @@ async def chatbot(request: Request):
         """
 
         aiplatform.init(project=PROJECT_ID, location=LOCATION)
-        model = GenerativeModel(model_name=ENDPOINT_ID)
+        model = GenerativeModel(model_name=VERTEX_MODEL_NAME)
         response = model.generate_content(full_prompt)
         return response.candidates[0].content.parts[0].text
         

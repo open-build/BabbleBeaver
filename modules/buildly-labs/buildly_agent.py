@@ -43,8 +43,9 @@ class BuildlyAgent:
         )
         self.timeout = timeout
         self.enabled = self._check_if_enabled()
+        self.auth_token = os.getenv('BUILDLY_AUTH_TOKEN')
         
-        logger.info(f"BuildlyAgent initialized. Enabled: {self.enabled}, Base URL: {self.base_url}")
+        logger.info(f"BuildlyAgent initialized. Enabled: {self.enabled}, Base URL: {self.base_url}, Auth: {'Yes' if self.auth_token else 'No'}")
     
     def _check_if_enabled(self) -> bool:
         """Check if the agent is enabled via environment variable."""
@@ -53,19 +54,24 @@ class BuildlyAgent:
     
     async def _fetch_endpoint(self, endpoint: str) -> Optional[Dict[str, Any]]:
         """
-        Fetch data from a specific API endpoint.
+        Fetch data from a specific API endpoint with Django token authentication.
         
         Args:
-            endpoint: API endpoint path (e.g., '/products/uuid')
+            endpoint: API endpoint path (e.g., '/product/product/uuid')
             
         Returns:
             JSON response as dict, or None if request fails
         """
         url = f"{self.base_url}{endpoint}"
         
+        # Prepare headers with Django token authentication
+        headers = {}
+        if self.auth_token:
+            headers['Authorization'] = f'Token {self.auth_token}'
+        
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(url)
+                response = await client.get(url, headers=headers)
                 response.raise_for_status()
                 return response.json()
         except httpx.TimeoutException:
@@ -80,7 +86,7 @@ class BuildlyAgent:
     
     async def get_product_info(self, product_uuid: str) -> Optional[Dict[str, Any]]:
         """
-        Fetch basic product information.
+        Fetch basic product information from Buildly Labs API.
         
         Args:
             product_uuid: UUID of the product
@@ -88,12 +94,15 @@ class BuildlyAgent:
         Returns:
             Product information dict or None
         """
-        endpoint = f"/products/{product_uuid}"
+        endpoint = f"/product/product/{product_uuid}/"
         return await self._fetch_endpoint(endpoint)
     
     async def get_product_features(self, product_uuid: str) -> Optional[List[Dict[str, Any]]]:
         """
-        Fetch product features.
+        Fetch product features from release/feature endpoint.
+        
+        Note: The actual endpoint filters features by product on the backend.
+        You may need to adjust this based on actual API behavior.
         
         Args:
             product_uuid: UUID of the product
@@ -101,12 +110,24 @@ class BuildlyAgent:
         Returns:
             List of features or None
         """
-        endpoint = f"/products/{product_uuid}/features"
-        return await self._fetch_endpoint(endpoint)
+        # First, try to get all features and filter client-side
+        # Or use a query parameter if supported
+        endpoint = f"/release/feature/?product={product_uuid}"
+        data = await self._fetch_endpoint(endpoint)
+        
+        # If endpoint doesn't support filtering, get all and filter
+        if data is None:
+            endpoint = "/release/feature/"
+            data = await self._fetch_endpoint(endpoint)
+            if data and isinstance(data, list):
+                # Filter by product_uuid if present in feature data
+                data = [f for f in data if f.get('product_uuid') == product_uuid or f.get('product') == product_uuid]
+        
+        return data
     
     async def get_product_releases(self, product_uuid: str) -> Optional[List[Dict[str, Any]]]:
         """
-        Fetch product releases.
+        Fetch product releases from release/release endpoint.
         
         Args:
             product_uuid: UUID of the product
@@ -114,8 +135,18 @@ class BuildlyAgent:
         Returns:
             List of releases or None
         """
-        endpoint = f"/products/{product_uuid}/releases"
-        return await self._fetch_endpoint(endpoint)
+        endpoint = f"/release/release/?product={product_uuid}"
+        data = await self._fetch_endpoint(endpoint)
+        
+        # If endpoint doesn't support filtering, get all and filter
+        if data is None:
+            endpoint = "/release/release/"
+            data = await self._fetch_endpoint(endpoint)
+            if data and isinstance(data, list):
+                # Filter by product_uuid
+                data = [r for r in data if r.get('product_uuid') == product_uuid or r.get('product') == product_uuid]
+        
+        return data
     
     async def gather_product_context(self, product_uuid: str) -> Dict[str, Any]:
         """

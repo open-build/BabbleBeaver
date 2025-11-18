@@ -6,6 +6,7 @@ import logging
 import importlib.util
 from random import sample
 from typing import Optional
+import sys
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,12 +26,18 @@ import vertexai
 from vertexai.preview.generative_models import  GenerativeModel
 from google.cloud import aiplatform
 
-# from openai import OpenAI
-import tiktoken
-
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
+
+# Import Buildly Labs Agent
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'modules'))
+try:
+    from buildly_labs.buildly_agent import enrich_user_message
+    BUILDLY_AGENT_AVAILABLE = True
+except ImportError:
+    logger.warning("Buildly Labs agent module not available")
+    BUILDLY_AGENT_AVAILABLE = False
 
 
 # Initialize dependencies
@@ -122,6 +129,20 @@ async def chatbot(request: Request):
     
     data = await request.json()
     user_message, history, tokens = data.get("prompt"), data.get("history"), data.get("tokens")
+    product_uuid = data.get("product_uuid")  # Optional product_uuid from client
+    
+    # Enrich user message with Buildly Labs product context (agentic capability)
+    enriched_message = user_message
+    product_context = {}
+    
+    if BUILDLY_AGENT_AVAILABLE:
+        try:
+            enriched_message, product_context = await enrich_user_message(user_message, product_uuid)
+            if product_context.get("enabled") and product_context.get("product_info"):
+                logger.info(f"Successfully enriched prompt with product context for UUID: {product_context.get('product_uuid')}")
+        except Exception as e:
+            logger.warning(f"Failed to enrich message with Buildly agent: {e}")
+            # Continue with original message if agent fails
 
     llm = "gemini-2.0-flash" # specify the model you want to use
     provider = "gemini" # specify the provider for this model
@@ -140,54 +161,39 @@ async def chatbot(request: Request):
                    model_name: str):
         
         '''
-        Genimi Model from Vertex AI
+        Gemini Model from Vertex AI
+        
+        This function now receives the enriched message that may include
+        Buildly Labs product context fetched agentically.
         '''
-        full_prompt = f"""You are a helpful assistant that provides resaurant names and menu items to questions for users in Seattle. 
-        Answer the following user question using ONLY the relevant restaurant and product details provided below. Be specific, concise, and friendly. 
+        full_prompt = f"""You are a helpful assistant that provides restaurant names and menu items to questions for users in Seattle. 
+        Answer the following user question using ONLY the relevant restaurant and product details provided below. Be specific, concise, and friendly.
+        
+        {conversation_history}
+        
         User Question:
         {user_message}
         """
 
-        # if provider == "openai":
-        #     client = OpenAI(api_key=api_key)
-
-        #     try:
-        #         response = client.chat.completions.create(
-        #             model=model_name,
-        #             messages=[
-        #                 {"role": "system", "content": initial_prompt},
-        #                 {"role": "user", "content": conversation_history + user_message}
-        #             ],
-        #             max_tokens=max_tokens,
-        #             temperature=temperature,
-        #         )
-
-        #         return response.choices[0].message.content.strip()
-            
-        #     except Exception as e:
-        #         raise e
-        # else:
-
         aiplatform.init(project=PROJECT_ID, location=LOCATION)
         model = GenerativeModel(model_name=ENDPOINT_ID)
-        response = model.generate_content(user_message)
+        response = model.generate_content(full_prompt)
         return response.candidates[0].content.parts[0].text
-        #     import google.generativeai as genai
-
-        #     model = genai.GenerativeModel(model_name)
-        #     genai.configure(api_key=api_key)
-        #     prompt = user_message
-            
-        #     response = model.generate_content(prompt)
-
-        #     # Extract the response text
-        #     return response.text
         
     message_logger.log_message(user_message)
 
     try:
         ai_configurator.set_model(provider, llm, tokenizer_function, completion_function, use_initial_prompt=True)
-        chat_response = await ai_configurator.process_response(history, user_message, tokens)  # Fixed call
+        # Use enriched message for processing
+        chat_response = await ai_configurator.process_response(history, enriched_message, tokens)
+        
+        # Optionally add product context metadata to response
+        if product_context.get("product_uuid"):
+            chat_response["product_context"] = {
+                "uuid": product_context.get("product_uuid"),
+                "enriched": True
+            }
+        
         return chat_response
     except Exception as e:
         logger.error(f"Error in chatbot processing: {e}")

@@ -200,5 +200,7 @@ async def chatbot(request: Request):
         
         return chat_response
     except Exception as e:
+        import traceback
         logger.error(f"Error in chatbot processing: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return JSONResponse({"response": "Sorry... An error occurred."}, status_code=500)

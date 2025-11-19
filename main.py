@@ -50,7 +50,8 @@ except FileNotFoundError:
     prompt_list = []
 
 # Google Generative AI Configuration
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# Check GOOGLE_API_KEY first (used in production), then GEMINI_API_KEY
+GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 

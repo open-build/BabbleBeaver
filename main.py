@@ -184,7 +184,7 @@ async def chatbot(request: Request):
     try:
         ai_configurator.set_model(provider, llm, tokenizer_function, completion_function, use_initial_prompt=True)
         # Use enriched message for processing
-        chat_response = await ai_configurator.process_response(history, enriched_message, tokens)
+        chat_response = ai_configurator.process_response(history, enriched_message, tokens)
         
         # Optionally add product context metadata to response
         if product_context.get("product_uuid"):

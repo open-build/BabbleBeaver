@@ -21,9 +21,7 @@ from ai_configurator import AIConfigurator
 from message_logger import MessageLogger
 
 
-from google.cloud import aiplatform
-import vertexai
-from vertexai.preview.generative_models import  GenerativeModel
+import google.generativeai as genai
 from google.cloud import aiplatform
 
 # Configure logging
@@ -51,21 +49,10 @@ try:
 except FileNotFoundError:
     prompt_list = []
 
-# Google Vertex AI Authentication, uvicorn main:app --reload      
-# Only set GOOGLE_APPLICATION_CREDENTIALS in the process environment
-# when the value is present (avoid assigning None which raises TypeError)
-_google_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-if _google_creds:
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _google_creds
-PROJECT_ID = os.getenv("PROJECT_ID")
-LOCATION = os.getenv("LOCATION")
-VERTEX_MODEL_NAME = os.getenv("VERTEX_MODEL_NAME", "gemini-2.0-flash-exp")  # Default to gemini-2.0-flash-exp
-vertexai.init(project=PROJECT_ID, location=LOCATION)
-model = GenerativeModel(VERTEX_MODEL_NAME)
-aiplatform.init(
-    project=PROJECT_ID,
-    location=LOCATION
-)
+# Google Generative AI Configuration
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 # FastAPI app instance
 
@@ -172,7 +159,7 @@ async def chatbot(request: Request):
                    model_name: str):
         
         '''
-        Gemini Model from Vertex AI
+        Gemini Model using Generative AI SDK
         
         This function now receives the enriched message that may include
         Buildly Labs product context fetched agentically.
@@ -186,9 +173,10 @@ async def chatbot(request: Request):
         {user_message}
         """
 
-        # Use the globally initialized model instead of creating a new one
+        # Use Generative AI SDK with API key
+        model = genai.GenerativeModel(model_name)
         response = model.generate_content(full_prompt)
-        return response.candidates[0].content.parts[0].text
+        return response.text
         
     message_logger.log_message(user_message)
 

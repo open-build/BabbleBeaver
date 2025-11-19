@@ -133,6 +133,13 @@ async def chatbot(request: Request):
     
     data = await request.json()
     user_message, history, tokens = data.get("prompt"), data.get("history"), data.get("tokens")
+    
+    # Ensure history has the correct structure - handle both list and dict formats
+    if history is None or history == [] or not isinstance(history, dict):
+        history = {"user": [], "bot": []}
+    elif "user" not in history or "bot" not in history:
+        logger.warning(f"History missing required keys, resetting to empty")
+        history = {"user": [], "bot": []}
     product_uuid = data.get("product_uuid")  # Optional product_uuid from client
     
     # Enrich user message with Buildly Labs product context (agentic capability)

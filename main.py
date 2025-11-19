@@ -186,8 +186,7 @@ async def chatbot(request: Request):
         {user_message}
         """
 
-        aiplatform.init(project=PROJECT_ID, location=LOCATION)
-        model = GenerativeModel(model_name=VERTEX_MODEL_NAME)
+        # Use the globally initialized model instead of creating a new one
         response = model.generate_content(full_prompt)
         return response.candidates[0].content.parts[0].text
         

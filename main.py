@@ -165,8 +165,8 @@ async def chatbot(request: Request):
         This function now receives the enriched message that may include
         Buildly Labs product context fetched agentically.
         '''
-        full_prompt = f"""You are a helpful assistant that provides restaurant names and menu items to questions for users in Seattle. 
-        Answer the following user question using ONLY the relevant restaurant and product details provided below. Be specific, concise, and friendly.
+        full_prompt = f"""You are a helpful AI assistant for Buildly Labs, a platform for building and managing software products. 
+        Answer user questions clearly and concisely. If product context is provided in the question, use it to give specific, relevant answers.
         
         {conversation_history}
         

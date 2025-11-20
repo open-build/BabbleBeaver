@@ -149,6 +149,13 @@ async def chatbot(request: Request):
     tokenizer_function = lambda text: len(tokenizer.encode(text)) # specify the tokenizing function to use
     with open("initial-prompt.txt", "r") as prompt_file:
         initial_prompt = prompt_file.read().strip()
+    
+    # Load system constraints
+    try:
+        with open("system-constraints.txt", "r") as constraints_file:
+            system_constraints = constraints_file.read().strip()
+    except FileNotFoundError:
+        system_constraints = ""
 
     # specify the completion function you'd like to use
     def completion_function(api_key: str, 
@@ -168,7 +175,12 @@ async def chatbot(request: Request):
         # Use the initial_prompt from initial-prompt.txt if provided
         system_instruction = initial_prompt if initial_prompt else "You are a helpful AI assistant for Buildly Labs."
         
-        full_prompt = f"""{system_instruction}
+        # Combine system instruction with constraints
+        full_system_prompt = system_instruction
+        if system_constraints:
+            full_system_prompt = f"{system_constraints}\n\n{system_instruction}"
+        
+        full_prompt = f"""{full_system_prompt}
         
         {conversation_history}
         

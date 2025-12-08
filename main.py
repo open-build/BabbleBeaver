@@ -665,28 +665,13 @@ async def get_client_config():
 
 
 @app.post("/chatbot")
-async def chatbot(request: Request):
+async def chatbot(request: Request, current_user: dict = Depends(get_current_user)):
     """
-    Chatbot endpoint - supports both authenticated API access and public web UI.
-    Authentication is optional - if Authorization header provided, validates it.
+    Chatbot endpoint - REQUIRES authentication.
+    Must include Authorization: Bearer TOKEN header.
     """
-    # Optional authentication - check if Authorization header provided
-    auth_header = request.headers.get("Authorization")
-    user_info = {"authenticated": False, "type": "public", "sub": "web_ui"}
-    
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.replace("Bearer ", "")
-        
-        # Check env token first
-        from auth import API_KEY
-        if API_KEY and token == API_KEY:
-            user_info = {"authenticated": True, "type": "api_key", "sub": "env_token"}
-        # Then check database
-        elif token_manager.verify_token(token):
-            user_info = {"authenticated": True, "type": "api_key", "sub": "api_access"}
-        # Invalid token provided
-        else:
-            raise HTTPException(status_code=401, detail="Invalid or expired API token")
+    # Get user info from validated token
+    user_info = current_user
     
     data = await request.json()
     # Accept both 'message' and 'prompt' for backward compatibility

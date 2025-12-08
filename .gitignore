@@ -171,3 +171,7 @@ cython_debug/
 
 .env
 
+# Operations runtime files
+ops/*.pid
+ops/*.log
+

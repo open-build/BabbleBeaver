@@ -3,6 +3,23 @@ $(document).ready(function () {
   sessionStorage.removeItem("messageHistory"); 
   sessionStorage.removeItem("totalUsedTokens");
 
+  // Fetch API configuration (including token)
+  let apiToken = null;
+  $.ajax({
+    url: "/api/config",
+    type: "GET",
+    async: false, // Wait for token before continuing
+    success: function(config) {
+      if (config.api_token) {
+        apiToken = config.api_token;
+        console.log('API token loaded');
+      }
+    },
+    error: function(error) {
+      console.log('Could not load API config:', error);
+    }
+  });
+
   const suggestedPrompts = $('#suggested-prompts');
 
   $.ajax({
@@ -67,10 +84,20 @@ $(document).ready(function () {
     let sessionNumTokens = sessionStorage.getItem("totalUsedTokens");
     let localNumTokens = sessionNumTokens ? JSON.parse(sessionNumTokens) : 0;
 
+    // Prepare headers with API token if available
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    
+    if (apiToken) {
+      headers['Authorization'] = `Bearer ${apiToken}`;
+    }
+
     $.ajax({
       url: '/chatbot',
       type: 'POST',
       contentType: 'application/json',
+      headers: headers,
       data: JSON.stringify({prompt: userMessage, history: localMessageHistory, tokens: localNumTokens}),
       success: function (data) {
         const {response: botMessage, usedTokens, updatedHistory} = data;

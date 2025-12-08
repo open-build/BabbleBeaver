@@ -37,3 +37,9 @@ numpy
 scikit-learn
 scipy
 matplotlib
+
+# Database support (SQLite for token storage)
+# Note: sqlite3 is included in Python standard library
+
+# Context management and caching
+redis>=5.0.0

@@ -40,90 +40,35 @@ class MessageLogger:
             logger.info(f"Using SQLite database: {db_path}")
         
         self._create_table()
-    
-    @contextmanager
-    def _get_connection(self):
-        """Context manager for database connections."""
-        if self.db_type == "postgresql":
-            conn = psycopg2.connect(self.db_url)
-            try:
-                yield conn
-                conn.commit()
-            except Exception:
-                conn.rollback()
-                raise
-            finally:
-                conn.close()
-        else:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            try:
-                yield conn
-                conn.commit()
-            except Exception:
-                conn.rollback()
-                raise
-            finally:
-                conn.close()
 
     def _create_table(self):
-        """Create messages table if it doesn't exist."""
-        if self.db_type == "postgresql":
-            with self._get_connection() as conn:
-                cursor = conn.cursor()
-                
-                # PostgreSQL syntax
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS messages (
-                        id SERIAL PRIMARY KEY,
-                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        user_message TEXT NOT NULL,
-                        bot_response TEXT,
-                        provider VARCHAR(50),
-                        model VARCHAR(100),
-                        tokens_used INTEGER,
-                        metadata JSONB
-                    )
-                """)
-                
-                # Create indexes
-                cursor.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_timestamp 
-                    ON messages(timestamp)
-                """)
-                
-                cursor.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_provider 
-                    ON messages(provider)
-                """)
-        else:
-            with self._get_connection() as conn:
-                cursor = conn.cursor()
-                
-                # SQLite syntax
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS messages (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        user_message TEXT NOT NULL,
-                        bot_response TEXT,
-                        provider TEXT,
-                        model TEXT,
-                        tokens_used INTEGER,
-                        metadata TEXT
-                    )
-                """)
-                
-                # Create indexes
-                cursor.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_timestamp 
-                    ON messages(timestamp)
-                """)
-                
-                cursor.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_provider 
-                    ON messages(provider)
-                """)
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            # Enhanced messages table with timestamp, response, and metadata
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    user_message TEXT NOT NULL,
+                    bot_response TEXT,
+                    provider TEXT,
+                    model TEXT,
+                    tokens_used INTEGER,
+                    metadata TEXT
+                )
+            """)
+            
+            # Create indexes for better query performance
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_timestamp 
+                ON messages(timestamp)
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_provider 
+                ON messages(provider)
+            """)
 
     def log_message(
         self, 
@@ -145,28 +90,19 @@ class MessageLogger:
             tokens_used: Number of tokens used
             metadata: Additional metadata as dictionary
         """
-        with self._get_connection() as conn:
+        with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             
-            if self.db_type == "postgresql":
-                # PostgreSQL uses JSONB for metadata
-                cursor.execute("""
-                    INSERT INTO messages 
-                    (user_message, bot_response, provider, model, tokens_used, metadata) 
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    RETURNING id
-                """, (message, response, provider, model, tokens_used, 
-                      json.dumps(metadata) if metadata else None))
-                return cursor.fetchone()[0]
-            else:
-                # SQLite uses TEXT for metadata
-                metadata_json = json.dumps(metadata) if metadata else None
-                cursor.execute("""
-                    INSERT INTO messages 
-                    (user_message, bot_response, provider, model, tokens_used, metadata) 
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (message, response, provider, model, tokens_used, metadata_json))
-                return cursor.lastrowid
+            metadata_json = json.dumps(metadata) if metadata else None
+            
+            cursor.execute("""
+                INSERT INTO messages 
+                (user_message, bot_response, provider, model, tokens_used, metadata) 
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (message, response, provider, model, tokens_used, metadata_json))
+            
+            conn.commit()
+            return cursor.lastrowid
 
     def retrieve_messages(
         self, 
@@ -189,33 +125,29 @@ class MessageLogger:
         Returns:
             List of message dictionaries
         """
-        with self._get_connection() as conn:
-            if self.db_type == "postgresql":
-                cursor = conn.cursor(cursor_factory=RealDictCursor)
-                placeholder = "%s"
-            else:
-                cursor = conn.cursor()
-                placeholder = "?"
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
             
             query = "SELECT * FROM messages WHERE 1=1"
             params = []
             
             if start_date:
-                query += f" AND timestamp >= {placeholder}"
+                query += " AND timestamp >= ?"
                 params.append(start_date)
             
             if end_date:
-                query += f" AND timestamp <= {placeholder}"
+                query += " AND timestamp <= ?"
                 params.append(end_date)
             
             if provider:
-                query += f" AND provider = {placeholder}"
+                query += " AND provider = ?"
                 params.append(provider)
             
             query += " ORDER BY timestamp DESC"
             
             if limit:
-                query += f" LIMIT {placeholder} OFFSET {placeholder}"
+                query += " LIMIT ? OFFSET ?"
                 params.extend([limit, offset])
             
             cursor.execute(query, params)
@@ -223,23 +155,13 @@ class MessageLogger:
             
             messages = []
             for row in rows:
-                if self.db_type == "postgresql":
-                    message = dict(row)
-                    # PostgreSQL JSONB is already parsed
-                else:
-                    message = dict(row)
-                    # Parse SQLite TEXT metadata
-                    if message.get('metadata'):
-                        try:
-                            message['metadata'] = json.loads(message['metadata'])
-                        except json.JSONDecodeError:
-                            message['metadata'] = None
-                
-                # Convert datetime to ISO format string
-                if message.get('timestamp'):
-                    if isinstance(message['timestamp'], datetime):
-                        message['timestamp'] = message['timestamp'].isoformat()
-                
+                message = dict(row)
+                # Parse metadata JSON
+                if message.get('metadata'):
+                    try:
+                        message['metadata'] = json.loads(message['metadata'])
+                    except json.JSONDecodeError:
+                        message['metadata'] = None
                 messages.append(message)
             
             return messages
@@ -251,23 +173,22 @@ class MessageLogger:
         provider: Optional[str] = None
     ) -> int:
         """Get count of messages with optional filtering."""
-        with self._get_connection() as conn:
+        with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            placeholder = "%s" if self.db_type == "postgresql" else "?"
             
             query = "SELECT COUNT(*) FROM messages WHERE 1=1"
             params = []
             
             if start_date:
-                query += f" AND timestamp >= {placeholder}"
+                query += " AND timestamp >= ?"
                 params.append(start_date)
             
             if end_date:
-                query += f" AND timestamp <= {placeholder}"
+                query += " AND timestamp <= ?"
                 params.append(end_date)
             
             if provider:
-                query += f" AND provider = {placeholder}"
+                query += " AND provider = ?"
                 params.append(provider)
             
             cursor.execute(query, params)
@@ -319,7 +240,7 @@ class MessageLogger:
 
     def get_analytics(self) -> Dict:
         """Get analytics about logged messages."""
-        with self._get_connection() as conn:
+        with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             
             # Total messages
@@ -336,22 +257,13 @@ class MessageLogger:
             by_provider = dict(cursor.fetchall())
             
             # Messages by date (last 30 days)
-            if self.db_type == "postgresql":
-                cursor.execute("""
-                    SELECT DATE(timestamp) as date, COUNT(*) as count 
-                    FROM messages 
-                    WHERE timestamp >= CURRENT_DATE - INTERVAL '30 days'
-                    GROUP BY DATE(timestamp)
-                    ORDER BY date DESC
-                """)
-            else:
-                cursor.execute("""
-                    SELECT DATE(timestamp) as date, COUNT(*) as count 
-                    FROM messages 
-                    WHERE timestamp >= DATE('now', '-30 days')
-                    GROUP BY DATE(timestamp)
-                    ORDER BY date DESC
-                """)
+            cursor.execute("""
+                SELECT DATE(timestamp) as date, COUNT(*) as count 
+                FROM messages 
+                WHERE timestamp >= DATE('now', '-30 days')
+                GROUP BY DATE(timestamp)
+                ORDER BY date DESC
+            """)
             by_date = dict(cursor.fetchall())
             
             # Average tokens used
@@ -366,5 +278,16 @@ class MessageLogger:
                 "total_messages": total_messages,
                 "by_provider": by_provider,
                 "by_date": by_date,
-                "avg_tokens": round(avg_tokens, 2)
+                "avg_tokens_used": round(avg_tokens, 2)
             }
+
+    def delete_old_messages(self, days: int = 90):
+        """Delete messages older than specified days."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                DELETE FROM messages 
+                WHERE timestamp < DATE('now', '-' || ? || ' days')
+            """, (days,))
+            conn.commit()
+            return cursor.rowcount

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>BabbleBeaver Chat Tester</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        .chat-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            background-color: #f5f5f5;
+        }
+        .chat-message {
+            margin-bottom: 20px;
+        }
+        .user-message {
+            text-align: right;
+        }
+        .user-message .message-text {
+            background-color: #2196f3;
+            color: #fff;
+            padding: 10px 15px;
+            border-radius: 5px;
+            display: inline-block;
+            max-width: 80%;
+        }
+        .bot-message .message-text {
+            background-color: #e0e0e0;
+            color: #212121;
+            padding: 10px 15px;
+            border-radius: 5px;
+            display: inline-block;
+            max-width: 80%;
+        }
+        .loader {
+          margin-left: 40px;
+          width: 15px;
+          aspect-ratio: 1;
+          border-radius: 50%;
+          animation: l5 1s infinite linear alternate;
+        }
+        #suggested-prompts {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 20px;
+        }
+        @keyframes l5 {
+            0%  {box-shadow: 20px 0 #000, -20px 0 #0002;background: #000 }
+            33% {box-shadow: 20px 0 #000, -20px 0 #0002;background: #0002}
+            66% {box-shadow: 20px 0 #0002,-20px 0 #000; background: #0002}
+            100%{box-shadow: 20px 0 #0002,-20px 0 #000; background: #000 }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1 class="text-center mt-5">🦫 BabbleBeaver Chat Tester</h1>
+    <p class="text-center text-muted">Testing interface for chatbot API</p>
+    
+    <div class="chat-container mt-5">
+        <div id="chat-history"></div>
+        <form id="chat-form">
+            <div class="form-group">
+                <input type="text" class="form-control" id="user-input" placeholder="Type your message...">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Send</button>
+        </form>
+        
+        <div id="suggested-prompts" class="mt-4">
+            <h5 class="text-center">Suggested Prompts</h5>
+            <button class="btn btn-outline-secondary btn-sm" onclick="setPrompt('What is Buildly?')">What is Buildly?</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="setPrompt('Tell me about Open Build')">Tell me about Open Build</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="setPrompt('How does BabbleBeaver work?')">How does BabbleBeaver work?</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Get API key from session storage or prompt user
+    let apiKey = sessionStorage.getItem('babblebeaver_api_key');
+    
+    if (!apiKey) {
+        apiKey = prompt('Please enter your API key:');
+        if (apiKey) {
+            sessionStorage.setItem('babblebeaver_api_key', apiKey);
+        } else {
+            alert('API key is required to use the chat tester');
+        }
+    }
+
+    const chatForm = document.getElementById('chat-form');
+    const userInput = document.getElementById('user-input');
+    const chatHistory = document.getElementById('chat-history');
+
+    function setPrompt(prompt) {
+        userInput.value = prompt;
+        userInput.focus();
+    }
+
+    chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const message = userInput.value.trim();
+        if (!message) return;
+
+        // Add user message to chat
+        addMessage(message, 'user');
+        userInput.value = '';
+
+        // Show loader
+        const loaderId = 'loader-' + Date.now();
+        addLoader(loaderId);
+
+        try {
+            const response = await fetch('/chatbot', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({ message: message })
+            });
+
+            removeLoader(loaderId);
+
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    sessionStorage.removeItem('babblebeaver_api_key');
+                    alert('Invalid API key. Please refresh and try again.');
+                    throw new Error('Unauthorized');
+                }
+                throw new Error('Request failed');
+            }
+
+            const data = await response.json();
+            addMessage(data.response, 'bot');
+        } catch (error) {
+            removeLoader(loaderId);
+            addMessage('Error: ' + error.message, 'bot');
+        }
+    });
+
+    function addMessage(text, sender) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${sender}-message`;
+        
+        const messageText = document.createElement('div');
+        messageText.className = 'message-text';
+        messageText.textContent = text;
+        
+        messageDiv.appendChild(messageText);
+        chatHistory.appendChild(messageDiv);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    function addLoader(id) {
+        const loaderDiv = document.createElement('div');
+        loaderDiv.id = id;
+        loaderDiv.className = 'chat-message bot-message';
+        loaderDiv.innerHTML = '<div class="loader"></div>';
+        chatHistory.appendChild(loaderDiv);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    function removeLoader(id) {
+        const loader = document.getElementById(id);
+        if (loader) {
+            loader.remove();
+        }
+    }
+</script>
+</body>
+</html>

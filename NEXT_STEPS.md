@@ -164,17 +164,17 @@ See [DATABASE.md](devdocs/DATABASE.md) for complete instructions, including Kube
 
 ### Rotate Exposed Credentials
 
-From the git history cleanup, these credentials need rotation:
+If any credentials were previously exposed in git history, rotate them immediately:
 
 1. **Google API Key**
    - Go to Google Cloud Console → APIs & Services → Credentials
-   - Delete old key `AIzaSyA9cZ5Fo8hJMfv0e8SzPc0_sOZPGE-0U9g`
+   - Delete the exposed key
    - Create new API key
    - Update `.env` with new key
 
 2. **Buildly Auth Token**
    - Go to your Buildly dashboard
-   - Revoke old token `x0j4wer78D_v7xnq4LnJ...`
+   - Revoke the exposed token
    - Generate new auth token
    - Update `.env` with new token
 

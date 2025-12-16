@@ -44,17 +44,25 @@ try:
 except FileNotFoundError:
     prompt_list = []
 
-# Google Vertex AI Authentication, uvicorn main:app --reload      
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+# Google Vertex AI Authentication (optional - only for GCP deployments)
+google_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+if google_creds:
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_creds
+
 PROJECT_ID = os.getenv("PROJECT_ID")
 LOCATION = os.getenv("LOCATION")
 ENDPOINT_ID = os.getenv("ENDPOINT_ID")
-vertexai.init(project=PROJECT_ID, location=LOCATION)
-model = GenerativeModel('gemini-2.0-flash-lite-001')
-aiplatform.init(
-    project=PROJECT_ID,
-    location=LOCATION
-)
+
+# Only initialize Vertex AI if credentials are provided
+if PROJECT_ID and LOCATION:
+    vertexai.init(project=PROJECT_ID, location=LOCATION)
+    model = GenerativeModel('gemini-2.0-flash-lite-001')
+    aiplatform.init(
+        project=PROJECT_ID,
+        location=LOCATION
+    )
+else:
+    model = None  # Will use standard Gemini API instead
 
 # FastAPI app instance
 

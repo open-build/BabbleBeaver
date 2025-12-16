@@ -31,7 +31,7 @@ Click the button below to deploy directly to DigitalOcean App Platform:
    **Resources:**
    - Type: Web Service
    - Name: `babblebeaver`
-   - Run Command: `uvicorn main:app --host 0.0.0.0 --port 8080 --workers 2 --log-level info`
+   - Run Command: `bash /app/start.sh`
    - HTTP Port: 8080
    - Build Command: `pip install -r requirements.txt`
    

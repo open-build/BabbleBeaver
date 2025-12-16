@@ -640,8 +640,9 @@ async def index_view(request: Request):
 
 
 @app.get("/test", response_class=HTMLResponse)
-async def test_view(request: Request, current_user: dict = Depends(get_current_user)):
-    """Render test chat UI (requires authentication)."""
+async def test_view(request: Request):
+    """Render test chat UI (authentication via frontend)."""
+    # Frontend will handle auth by sending bearer token with API requests
     return templates.TemplateResponse("test.html", {"request": request})
 
 

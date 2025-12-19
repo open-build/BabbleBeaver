@@ -1,4 +1,3 @@
-
 # main.py
 from http.client import HTTPException
 import os
@@ -8,48 +7,46 @@ from random import sample
 from typing import Optional
 import sys
 
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 import openai  # Corrected import
-import tiktoken
-
 from ai_configurator import AIConfigurator
 from message_logger import MessageLogger
-from context_manager import context_manager
-from context_builder import context_builder
-from llm_manager import llm_manager, LLMProvider
-from auth import (
-    verify_admin_credentials,
-    get_current_user,
-    require_admin
-)
-from token_manager import token_manager
-
+from response_logger import ChatLogger
 
 import google.generativeai as genai
 from google.cloud import aiplatform
+import vertexai
+from vertexai.preview.generative_models import  GenerativeModel
+from google.cloud import aiplatform
+
+import google.generativeai as genai
+from google.generativeai import types
 
 # Configure logging
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Import Buildly Labs Agent
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'modules'))
-try:
-    from buildly_labs.buildly_agent import enrich_user_message
-    BUILDLY_AGENT_AVAILABLE = True
-except ImportError:
-    logger.warning("Buildly Labs agent module not available")
-    BUILDLY_AGENT_AVAILABLE = False
+app = FastAPI(debug=True)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ALLOWED_DOMAINS", "*").split(","),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Initialize dependencies
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
 ai_configurator = AIConfigurator()
 message_logger = MessageLogger()
+response_logger = ChatLogger()
 
 # Load prompt suggestions
 try:
@@ -58,14 +55,19 @@ try:
 except FileNotFoundError:
     prompt_list = []
 
-# Google Generative AI Configuration
-# Check GOOGLE_API_KEY first (used in production), then GEMINI_API_KEY
-GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+PROJECT_ID = os.getenv("PROJECT_ID")
+PROJECT_NAME = os.getenv("PROJECT_NAME")
+LOCATION = os.getenv("LOCATION")
+ENDPOINT_ID = os.getenv("ENDPOINT_ID")
+
+vertexai.init(project=PROJECT_NAME, location=LOCATION)
+model = GenerativeModel(os.getenv("FINE_TUNED_MODEL"))
+aiplatform.init(
+    project=PROJECT_ID,
+    location=LOCATION
+)
 
 # FastAPI app instance
-
 app = FastAPI(debug=True)
 
 # Middleware for CORS
@@ -88,7 +90,7 @@ else:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=os.getenv("CORS_ALLOWED_DOMAINS", "*").split(","),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -97,6 +99,48 @@ app.add_middleware(
 # Static and template mounting
 templates = Jinja2Templates(directory="templates")
 
+UPLOAD_DIR = "secure_credentials"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+CREDENTIALS_PATH = os.path.abspath(os.path.join(UPLOAD_DIR, "service_account.json"))
+
+def ensure_google_credentials_env():
+    """Set the GOOGLE_APPLICATION_CREDENTIALS env var if the file exists."""
+    if os.path.exists(CREDENTIALS_PATH):
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = CREDENTIALS_PATH
+        logger.info(f"Set GOOGLE_APPLICATION_CREDENTIALS to {CREDENTIALS_PATH}")
+
+def credentials_needed(provider: str):
+    if provider.lower() in ["gemini", "vertex", "vertexai"]:
+        logger.info(f"Checking for credentials file at: {CREDENTIALS_PATH}")
+        return not os.path.exists(CREDENTIALS_PATH)
+    return False
+
+@app.get("/upload_credentials", response_class=HTMLResponse)
+async def upload_credentials_form(request: Request):
+    html_content = """
+    <html>
+        <body>
+            <h2>Upload Google Service Account Credentials</h2>
+            <form action="/upload_credentials" enctype="multipart/form-data" method="post">
+                <input name="file" type="file" accept=".json">
+                <input type="submit">
+            </form>
+        </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
+@app.post("/upload_credentials")
+async def upload_credentials(file: UploadFile = File(...)):
+    if not file.filename.endswith(".json"):
+        logger.error("Attempted to upload non-JSON credentials file.")
+        return JSONResponse({"error": "Only JSON files are allowed."}, status_code=400)
+    save_path = CREDENTIALS_PATH
+    with open(save_path, "wb") as buffer:
+        buffer.write(await file.read())
+    ensure_google_credentials_env()
+    logger.info(f"Credentials uploaded and saved to {save_path}")
+    return RedirectResponse(url="/", status_code=303)
 
 # Protected static file serving with token authentication
 async def verify_static_access(request: Request):
@@ -597,41 +641,51 @@ async def admin_login_page(request: Request):
 
 
 def call_function_from_file(folder_path, module_name, function_name):
-    """Safely loads a module and executes a function."""
     module_path = os.path.join(folder_path, f"{module_name}.py")
-
     if not os.path.exists(module_path):
-        return "Module file does not exist."
-
+        logger.error(f"Module file {module_path} does not exist.")
+        return None
     spec = importlib.util.spec_from_file_location(module_name, module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-
     func = getattr(module, function_name, None)
     if func is None:
-        return "Function not found."
+        logger.error(f"Function {function_name} not found in {module_name}.py")
+    return func
 
-    return func()
+
+def serialize_chat(chat):
+    return {
+        # "id": chat.id,
+        "session_id": chat.session_id,
+        "sender": chat.sender,
+        "message": chat.message,
+        "timestamp": chat.timestamp.isoformat() if chat.timestamp else None
+    }
 
 
-@app.get("/pre_user_prompt", response_class=JSONResponse)
-async def pre_user_prompt(current_user: dict = Depends(get_current_user)):
-    """Fetch suggested prompts."""
-    suggested_prompts = sample(prompt_list, min(3, len(prompt_list)))  # Fix for <3 prompts
-    return JSONResponse(suggested_prompts)
+@app.post("/pre_user_prompt", response_class=JSONResponse)
+async def pre_user_prompt(request: Request):
+    data = await request.json()
+    session_id = data.get("session_id")
+    suggested_prompts = sample(prompt_list, min(4, len(prompt_list)))
+    chat_records = response_logger.select_all_messages(session_id)
+    prompt_history = [serialize_chat(chat) for chat in chat_records]
+    return {
+        "suggested_prompts": suggested_prompts,
+        "prompt_history": prompt_history
+    }
 
 
 @app.get("/post_response", response_class=JSONResponse)
-async def post_response(keyword: str, current_user: dict = Depends(get_current_user)):
-    """Fetch related news articles."""
+async def post_response(keyword: str):
     search_rss_feed = call_function_from_file("modules/buildly-collect", "news-blogs", "search_rss_feed")
-
     if callable(search_rss_feed):
         news = search_rss_feed(rss_url="https://www.buildly.io/news/feed/", keyword=keyword)
+        logger.info(f"Fetched news for keyword: {keyword}")
         return JSONResponse(news)
-    
+    logger.error("Failed to fetch news.")
     return JSONResponse({"error": "Failed to fetch news"}, status_code=500)
-
 
 @app.get("/", response_class=HTMLResponse)
 async def index_view(request: Request):
@@ -648,314 +702,111 @@ async def test_view(request: Request):
 
 @app.get("/chat", response_class=HTMLResponse)
 async def chat_view(request: Request):
-    """Render chat UI (public access for web interface)."""
     return templates.TemplateResponse("chat.html", {"request": request})
 
 
-@app.get("/api/config")
-async def get_client_config():
-    """
-    Public endpoint to get client configuration.
-    Provides the environment API token for chat UI.
-    """
-    env_token = os.getenv("API_KEY")
-    return JSONResponse({
-        "api_token": env_token,
-        "has_token": env_token is not None
-    })
+'''
+Generate answer with genai(kai_fine_2_5_v2) client from Vertex AI
+return dict
+'''
+def generate_from(user_prompt, project_id, location, endpoint_id):
+    client = genai.Client(
+        vertexai=True,
+        project=project_id,
+        location=location,
+    )
 
-
-@app.get("/api/cost-estimate")
-async def get_cost_estimates(
-    workflow: str = "simple_chat",
-    requests_per_day: int = 1000
-):
-    """
-    Get cost estimates for all providers for a specific workflow type.
-    
-    Query Parameters:
-        - workflow: Type of workflow (simple_chat, context_aware, agent_with_tools, long_document, code_generation)
-        - requests_per_day: Number of requests per day (default: 1000)
-    
-    Returns:
-        List of cost estimates sorted by total cost
-    """
-    try:
-        from cost_estimator import quick_estimate
-        
-        estimates = quick_estimate(
-            requests_per_day=requests_per_day,
-            workflow_type=workflow
+    model=endpoint_id
+    contents = [
+        types.Content(
+            role="user",
+            parts=[
+                types.Part.from_text(text=user_prompt)
+            ]
         )
-        
-        return JSONResponse({
-            "workflow": workflow,
-            "requests_per_day": requests_per_day,
-            "estimates": estimates,
-            "currency": "USD",
-            "period": "monthly"
-        })
-    except Exception as e:
-        logger.error(f"Error calculating cost estimates: {e}")
-        return JSONResponse(
-            {"error": str(e)},
-            status_code=500
-        )
+    ]
 
+    generate_content_config = types.GenerateContentConfig(
+        temperature = 1,
+        top_p = 1,
+        seed = 0,
+        max_output_tokens = 65535,
+        safety_settings = [types.SafetySetting(
+        category="HARM_CATEGORY_HATE_SPEECH",
+        threshold="OFF"
+        ),types.SafetySetting(
+        category="HARM_CATEGORY_DANGEROUS_CONTENT",
+        threshold="OFF"
+        ),types.SafetySetting(
+        category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        threshold="OFF"
+        ),types.SafetySetting(
+        category="HARM_CATEGORY_HARASSMENT",
+        threshold="OFF"
+        )],
+        thinking_config=types.ThinkingConfig(
+        thinking_budget=-1,
+        ),
+    )
 
-@app.get("/api/cost-estimate/{provider}/{model}")
-async def get_provider_cost_estimate(
-    provider: str,
-    model: str,
-    workflow: str = "simple_chat",
-    requests_per_day: int = 1000
-):
-    """
-    Get cost estimate for a specific provider and model.
-    
-    Path Parameters:
-        - provider: Provider name (digitalocean, gemini, openai, anthropic)
-        - model: Model name (llama_3_1_70b, flash_2_0, gpt_4o_mini, etc.)
-    
-    Query Parameters:
-        - workflow: Type of workflow (default: simple_chat)
-        - requests_per_day: Number of requests per day (default: 1000)
-    
-    Returns:
-        Cost estimate for the specified provider
-    """
-    try:
-        from cost_estimator import CostEstimator, WorkflowType
-        
+    full_text = ""
+    model_version = None
+    total_token_count = None
+
+    for chunk in client.models.generate_content_stream(
+        model = model,
+        contents = contents,
+        config = generate_content_config,
+        ):
         try:
-            workflow_type = WorkflowType(workflow)
-        except ValueError:
-            return JSONResponse(
-                {"error": f"Invalid workflow type: {workflow}"},
-                status_code=400
-            )
-        
-        estimate = CostEstimator.estimate_monthly_cost(
-            provider=provider,
-            model=model,
-            requests_per_day=requests_per_day,
-            workflow_type=workflow_type,
-            include_infrastructure=True
-        )
-        
-        if 'error' in estimate:
-            return JSONResponse(estimate, status_code=400)
-        
-        return JSONResponse(estimate)
-        
-    except Exception as e:
-        logger.error(f"Error calculating cost estimate: {e}")
-        return JSONResponse(
-            {"error": str(e)},
-            status_code=500
-        )
+            parts = chunk.candidates[0].content.parts
+            for part in parts:
+                if hasattr(part, "text"):
+                    full_text += part.text
 
+            if model_version is None and hasattr(chunk, "model_version"):
+                model_version = chunk.model_version
 
-@app.get("/api/pricing")
-async def get_pricing_table():
-    """
-    Get complete pricing table for all providers and models.
-    
-    Returns:
-        Comprehensive pricing information
-    """
-    try:
-        from cost_estimator import CostEstimator
-        
-        pricing = CostEstimator.get_pricing_table()
-        return JSONResponse(pricing)
-        
-    except Exception as e:
-        logger.error(f"Error retrieving pricing table: {e}")
-        return JSONResponse(
-            {"error": str(e)},
-            status_code=500
-        )
+            if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
+                usage = chunk.usage_metadata
+                if hasattr(usage, "total_token_count") and usage.total_token_count:
+                    total_token_count = usage.total_token_count
+
+        except Exception as e:
+            print("Error while parsing chunk:", e)
+
+    parsed_output = {
+        "text": full_text.strip(),
+        "model_version": model_version,
+        "total_token_count": total_token_count
+    }
+    return parsed_output
 
 
 @app.post("/chatbot")
-async def chatbot(request: Request, current_user: dict = Depends(get_current_user)):
-    """
-    Chatbot endpoint - REQUIRES authentication.
-    Must include Authorization: Bearer TOKEN header.
-    """
-    # Get user info from validated token
-    user_info = current_user
+async def chatbot(request: Request):
+    project_id = os.getenv("PROJECT_ID")
+    location = os.getenv("LOCATION")
+    endpoint_id = os.getenv("ENDPOINT_ID")
     
     data = await request.json()
-    # Accept both 'message' and 'prompt' for backward compatibility
-    user_message = data.get("message") or data.get("prompt")
-    
-    # Get user-provided context (NEW: context-aware feature)
-    user_context = data.get("context", {})
-    
-    # Context handling - support both full context and context hash
-    context_hash = data.get("context_hash")
-    user_id = user_info.get("sub", "web_ui")
-    
-    if context_hash:
-        # Retrieve context from hash
-        logger.info(f"Using context hash: {context_hash}")
-        context_data = context_manager.resolve_context_hash(context_hash)
-        
-        if context_data:
-            history = context_data.get("history", {"user": [], "bot": []})
-            product_uuid = context_data.get("product_uuid")
-        else:
-            logger.warning(f"Context hash not found: {context_hash}, using defaults")
-            history = {"user": [], "bot": []}
-            product_uuid = None
-    else:
-        # Traditional approach - full context in request
-        history = data.get("history")
-        product_uuid = data.get("product_uuid")
-        
-        # Also check user_context for product_uuid (context-aware feature)
-        if not product_uuid and user_context.get("product_uuid"):
-            product_uuid = user_context["product_uuid"]
-    
-    tokens = data.get("tokens")
-    
-    # Ensure history has the correct structure - handle both list and dict formats
-    if history is None or history == [] or not isinstance(history, dict):
-        history = {"user": [], "bot": []}
-    elif "user" not in history or "bot" not in history:
-        logger.warning(f"History missing required keys, resetting to empty")
-        history = {"user": [], "bot": []}
-    
-    # Prune history to stay within token limits
-    history = context_manager.prune_history(history, max_tokens=2000)
-    
-    # Enrich user message with Buildly Labs product context (agentic capability)
-    enriched_message = user_message
-    product_context = {}
-    
-    if BUILDLY_AGENT_AVAILABLE:
-        try:
-            enriched_message, product_context = await enrich_user_message(user_message, product_uuid)
-            if product_context.get("enabled") and product_context.get("product_info"):
-                logger.info(f"Successfully enriched prompt with product context for UUID: {product_context.get('product_uuid')}")
-        except Exception as e:
-            logger.warning(f"Failed to enrich message with Buildly agent: {e}")
-            # Continue with original message if agent fails
+    user_message, history, tokens, session_id = data.get("prompt"), data.get("history"), data.get("tokens") , '12344412'       
 
-    llm = "gemini-2.0-flash" # specify the model you want to use
-    provider = "gemini" # specify the provider for this model
-    tokenizer = tiktoken.get_encoding("cl100k_base") # specify the tokenizer to use for this model
-    tokenizer_function = lambda text: len(tokenizer.encode(text)) # specify the tokenizing function to use
-    with open("initial-prompt.txt", "r") as prompt_file:
-        initial_prompt = prompt_file.read().strip()
+    full_prompt = f"""You are a helpful assistant that provides resaurant names and menu items to questions for users in Seattle. 
+        Answer the following user question using ONLY the relevant restaurant and product details provided below. Be specific, concise, and friendly. 
+        User Question:
+        {user_message}
+        """
     
-    # Load system constraints
-    try:
-        with open("system-constraints.txt", "r") as constraints_file:
-            system_constraints = constraints_file.read().strip()
-    except FileNotFoundError:
-        system_constraints = ""
+    print(user_message)
 
-    # Build full prompt for LLM
-    system_instruction = initial_prompt if initial_prompt else "You are a helpful AI assistant for Buildly Labs."
-    
-    # Combine system instruction with constraints
-    full_system_prompt = system_instruction
-    if system_constraints:
-        full_system_prompt = f"{system_constraints}\n\n{system_instruction}"
-    
-    # CONTEXT-AWARE: Enhance system prompt with context (NEW)
-    full_system_prompt = context_builder.build_context_prompt(
-        base_prompt=full_system_prompt,
-        context=user_context,
-        product_context=product_context
-    )
-    
-    # Format conversation history
-    conversation_history = ""
-    if history.get("user") and history.get("bot"):
-        for user_msg, bot_msg in zip(history["user"], history["bot"]):
-            conversation_history += f"User: {user_msg}\nAssistant: {bot_msg}\n"
-    
-    full_prompt = f"""{full_system_prompt}
-    
-    {conversation_history}
-    
-    User Question:
-    {enriched_message}
-    """
+    response_logger.insert_message(session_id, "user", user_message)
 
-    try:
-        # Use LLM manager with fallback capability
-        result = llm_manager.generate(full_prompt)
-        
-        bot_response = result["response"]
-        provider_used = result["provider"]
-        model_used = result["model"]
-        
-        # Update conversation history
-        history["user"].append(user_message)
-        history["bot"].append(bot_response)
-        
-        # Create/update context hash for next request
-        new_context_hash = context_manager.create_context_hash(
-            user_id=user_id,
-            product_uuid=product_uuid,
-            history=history,
-            metadata={
-                "last_provider": provider_used,
-                "last_model": model_used
-            }
-        )
-        
-        # Log the interaction with metadata
-        message_logger.log_message(
-            message=user_message,
-            response=bot_response,
-            provider=provider_used,
-            model=model_used,
-            tokens_used=tokens,
-            metadata={
-                "enriched": enriched_message != user_message,
-                "product_uuid": product_context.get("product_uuid"),
-                "user": user_id,
-                "context_hash": new_context_hash
-            }
-        )
-        
-        # Build response
-        chat_response = {
-            "response": bot_response,
-            "provider": provider_used,
-            "model": model_used,
-            "tokens": tokens,
-            "context_hash": new_context_hash  # Return hash for next request
-        }
-        
-        # Optionally add product context metadata to response
-        if product_context.get("product_uuid"):
-            chat_response["product_context"] = {
-                "uuid": product_context.get("product_uuid"),
-                "enriched": True
-            }
-        
-        return JSONResponse(chat_response)
-        
-    except Exception as e:
-        import traceback
-        logger.error(f"Error in chatbot processing: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        
-        # Log the error with empty response
-        message_logger.log_message(
-            message=user_message,
-            response=f"Error: {str(e)}",
-            metadata={
-                "error": str(e),
-                "user": user_id
-            }
-        )
-        
-        return JSONResponse({"response": "Sorry... An error occurred."}, status_code=500)
+    response = generate_from(full_prompt, project_id, location, endpoint_id)
+    response_dict = response
+
+    message_logger.log_message(user_message, session_id)
+    
+    response_logger.insert_message(session_id, "bot", response_dict['text'])
+
+    return {'prompt': full_prompt, 'user_prompt': user_message, 'kai_response': response_dict['text'], 'model_version': response_dict['model_version'], 'history': "response_logger.select_all_messages(session_id)", 'tokens': response_dict['total_token_count']}

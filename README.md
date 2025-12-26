@@ -21,6 +21,10 @@ To configure environment variables for BabbleBeaver, you need to create a `.env`
 
 Make sure to keep the `.env` file secure and do not expose it publicly, as it may contain sensitive information.
 
+To obtain the GOOGLE_APPLICATION_CREDENTIALS in the .env locate file inside the storage bucket: drunr_model_dataset, file is named: drunr-prod-97f378603f61.json. Place this file in an ./assets folder. Permission/Roles are managaed by vertexai_bot. 
+
+To obtain the ENDPOINT_ID, the endpoint is found under the fine-tuned model in Model Garden
+
 ### Running the FastAPI application locally
 
 - Make sure you have Python installed on your machine. You can download and install Python from the official website: https://www.python.org/downloads/

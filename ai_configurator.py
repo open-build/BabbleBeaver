@@ -11,15 +11,17 @@ class AIConfigurator:
         # Holds the current model instance
         self.current_model_instance = None  
 
-        # Load initial prompt from file
+        # Load initial prompt from file (env or fallback to initial-prompt.txt)
         self.initial_prompt = ""
         prompt_file_path = os.getenv('INITIAL_PROMPT_FILE_PATH')
-        if prompt_file_path:
+        if not prompt_file_path or not os.path.exists(prompt_file_path):
+            prompt_file_path = "initial-prompt.txt"
+        if prompt_file_path and os.path.exists(prompt_file_path):
             try:
                 with open(prompt_file_path, "r") as prompt_file:
                     self.initial_prompt = prompt_file.read()
             except FileNotFoundError:
-                pass
+                self.initial_prompt = ""
         
         # Variables related to conversation history and token usage
         self.conversation_history = {"user": [], "bot": []}  # Ensure default structure
@@ -57,7 +59,7 @@ class AIConfigurator:
         """Generate a response using OpenAI API."""
         openai.api_key = os.getenv("OPENAI_API_KEY")  # Ensure the API key is set
         prompt = f"""
-        The following is a conversation with an AI assistant. The assistant is helpful, creative, clever, and very friendly.
+        {self.initial_prompt}
         {user_message}
         """
         try:
@@ -102,11 +104,11 @@ class AIConfigurator:
 
         query_tokens = self.retrieve_response_and_tokens(user_message)["tokens"]
 
-        if history["user"] and history["bot"]:
+        if history.get("user") and history.get("bot"):
             if query_tokens + self.used_tokens >= self.token_limit:
                 self.tokens_exceeded = True
                 while query_tokens + self.used_tokens >= self.token_limit:
-                    if history["user"] and history["bot"]:
+                    if history.get("user") and history.get("bot"):
                         query = history["user"].pop(0)
                         response = history["bot"].pop(0)
 

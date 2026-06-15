@@ -171,3 +171,10 @@ cython_debug/
 
 .env
 .env.prod.do
+
+# Credentials / service account keys — never commit
+secure_credentials/
+assets/*.json
+*service_account*.json
+*-service-account*.json
+*drunr-prod*.json

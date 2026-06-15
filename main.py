@@ -17,6 +17,8 @@ import openai
 from ai_configurator import AIConfigurator
 from message_logger import MessageLogger
 from response_logger import ChatLogger
+from user_context import fetch_user_context, format_user_context, resolve_identity
+from daily_scores import upsert_daily_scores
 
 from google.cloud import aiplatform, bigquery
 import vertexai
@@ -249,7 +251,7 @@ def vector_search_restaurants(query_text: str, top_k: int = 10) -> list:
 Generate answer with genai(kai_fine_2_5_v2) client from Vertex AI
 return dict
 '''
-def generate_from_v2(user_query: str, search_results: list, project_id, location, endpoint_id) -> str:
+def generate_from_v2(user_query: str, search_results: list, project_id, location, endpoint_id, user_context_block: str = "") -> str:
     """Optimized version - fewer tokens, better accuracy"""
     client = genai.Client(
         vertexai=True,
@@ -305,28 +307,62 @@ def generate_from_v2(user_query: str, search_results: list, project_id, location
         if parts:
             context += f"   Nutrition: {', '.join(parts)}\n"
 
-    prompt = f"""
-    You are Kai, DrunR's AI nutrition guide.
-    Keep answers short unless the user asks for detail.
-    Default answer length: 3 bullets or fewer.
-    Avoid long paragraphs.
-    Avoid repeating the user's question.
-    End with one clear next action when useful.
+    user_context_section = f"\n    {user_context_block}\n" if user_context_block else ""
 
+    prompt = f"""
+    You are Kai, DrunR's AI nutrition guide. Talk like a warm, encouraging friend
+    who happens to know food and health well — natural and conversational, never
+    clinical or robotic. Use "you," skip jargon, and don't restate the question.
+{user_context_section}
     User request:
     {user_query}
 
     Available menu results:
     {context}
 
+    FIRST decide which mode to use:
+
+    INDECISION MODE — use this when the user sounds stuck, torn, or can't choose
+    between options (e.g. "I can't decide," "which one?", "they all look good,"
+    "help me pick," or they list a few items and ask you to choose). Instead of
+    just handing them an answer, gently guide them to their own choice:
+    - Open with one warm, reassuring sentence.
+    - Ask 1-2 short Socratic questions that help them weigh the real menu options
+      against what matters to them right now (e.g. "Are you after something light
+      or something that'll keep you full?", "Do you want to lean into your protein
+      goal today, or just something that sounds good?"). Anchor the questions to
+      the actual menu results and their profile/health data when present.
+    - Offer to narrow it down once they answer. Do NOT lecture or pick for them
+      unless they ask you to. Keep it to a few sentences — skip the 3-part format.
+
+    RECOMMENDATION MODE — use this for normal requests where the user wants a
+    suggestion. Reply in exactly these three parts, with no headers shown to the
+    user other than the bold labels below:
+
+    1. A short, friendly opener (one sentence) and then 1-2 concrete picks — a
+       meal and/or a restaurant from the menu results. Name the dish and the spot,
+       and one quick reason each. Keep it to a couple of sentences, not a long list.
+
+    2. **Why this fits you:** 1-2 short bullets that highlight the specific user
+       profile detail(s) and recent health data you used (e.g. "your resting heart
+       rate is steady at 48 bpm" or "you're pescatarian and avoiding dairy"). Only
+       mention data that is actually present in the USER HEALTH PROFILE above.
+
+    3. A single friendly closing line with one clear next step (a question or
+       suggestion).
+
     Rules:
-    - Use ONLY the available menu results above.
-    - Do NOT invent nutrition, ingredients, restaurant details, or health claims.
-    - If a required field is missing, say it is not available yet.
-    - Prioritize GLP-1-friendly patterns when relevant: higher protein, moderate calories,
-    lower added sugar, avoid very heavy/fried options when possible.
-    - Be friendly, practical, and concise.
-    - Do not provide medical advice.
+    - Use ONLY the available menu results for dish/restaurant facts. Never invent
+      nutrition, ingredients, restaurant details, or health claims.
+    - In INDECISION MODE, only reference dishes/restaurants that appear in the menu
+      results above when framing your questions.
+    - If the user profile or health data is empty, skip part 2 gracefully rather
+      than guessing — just give the picks and the closing line.
+    - Respect dietary preferences, allergies, and GLP-1 medication when present.
+    - Favor GLP-1-friendly patterns when relevant: higher protein, moderate
+      calories, lower added sugar, lighter/non-fried options.
+    - Keep the whole reply tight and human — a few sentences, not an essay.
+    - Be supportive, never preachy. Do not give medical advice.
     """
 
     chunk = client.models.generate_content(
@@ -363,6 +399,23 @@ async def chatbot(request: Request):
     data = await request.json()
     user_message, history, tokens, session_id = data.get("prompt"), data.get("history"), data.get("tokens") , data.get("session_id", '12344412')
 
+    # Identity comes from the signed bearer token, never the request body, so a
+    # caller cannot pull another user's health data by guessing a core_user_uuid.
+    core_user_uuid, bearer_token = resolve_identity(request.headers.get("Authorization"))
+
+    # User health profile + wearable biometrics from user_service (optional)
+    user_context_block = ""
+    if core_user_uuid:
+        user_ctx = await fetch_user_context(core_user_uuid, bearer_token=bearer_token)
+        user_context_block = format_user_context(user_ctx)
+        # Deterministic MAI scores (SCORING.md): persist today's snapshot and
+        # inject the block to weight recommendations.
+        score_block = upsert_daily_scores(user_ctx, core_user_uuid)
+        if score_block:
+            user_context_block = (
+                f"{user_context_block}\n\n{score_block}" if user_context_block else score_block
+            )
+
     # Similarity Search from BigQuery vectorDB
     search_results = vector_search_restaurants(
             query_text=user_message,
@@ -380,7 +433,7 @@ async def chatbot(request: Request):
     response_logger.insert_message(session_id, "user", user_message)
 
     # response = generate_from(full_prompt, project_id, location, endpoint_id)
-    response = generate_from_v2(user_message, search_results, project_id, location, endpoint_id)
+    response = generate_from_v2(user_message, search_results, project_id, location, endpoint_id, user_context_block)
     response_dict = response
 
     message_logger.log_message(user_message, session_id)

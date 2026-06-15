@@ -6,9 +6,12 @@ Supports SQLite for development and PostgreSQL for production.
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean, JSON
+from sqlalchemy import (
+    create_engine, Column, Integer, String, Text, DateTime, Date, Boolean, JSON,
+    UniqueConstraint,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from contextlib import contextmanager
@@ -72,6 +75,36 @@ class APIToken(Base):
             'is_active': self.is_active,
             'is_expired': is_expired,
             'last_used_at': self.last_used_at.isoformat() if self.last_used_at else None
+        }
+
+
+class DailyScore(Base):
+    """Persisted snapshot of a user's MAI scores for a single day.
+
+    One row per (user, date); upserted on each chat so the latest day's scores
+    are fresh while history accrues for drift baselines (SCORING.md Rule 14) and
+    dashboards. `scores` holds the serialized rule output (see scoring.py).
+    """
+    __tablename__ = 'daily_scores'
+    __table_args__ = (
+        UniqueConstraint('core_user_uuid', 'score_date', name='uq_user_score_date'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    core_user_uuid = Column(String(64), nullable=False, index=True)
+    score_date = Column(Date, nullable=False, default=date.today, index=True)
+    scores = Column(JSON, nullable=False)  # {key: {value, complete, note}}
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'core_user_uuid': self.core_user_uuid,
+            'score_date': self.score_date.isoformat() if self.score_date else None,
+            'scores': self.scores,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
 
 
